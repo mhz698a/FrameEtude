@@ -203,8 +203,12 @@ class FFmpegWorker(QtCore.QObject):
 
                     rc = proc.poll()
                     if rc not in (0, None):
-                        # read remaining stderr
-                        err = proc.stderr.read() if proc.stderr else ""
+                        # Capture any remaining output
+                        try:
+                            stdout_rem, stderr_rem = proc.communicate(timeout=2)
+                            err = (stderr_rem or "")
+                        except Exception:
+                            err = ""
                         raise Exception(f"ffmpeg returned {rc}. stderr:\n{err}")
 
                     # final update to 100% for this stage
@@ -224,16 +228,18 @@ class FFmpegWorker(QtCore.QObject):
                 if add_black:
                     black_tmp = os.path.join(tmpdir, "black.mp4")
                     # ensure width/height and fps known; fallback to 1280x720/fps if missing
-                    w = width or 1280
-                    h = height or 720
-                    r = int(round(fps)) if fps and not math.isnan(fps) else 25
+                    # Ensure even dimensions for libx264/yuv420p compatibility
+                    w = (width or 1280) // 2 * 2
+                    h = (height or 720) // 2 * 2
+                    r = max(1, int(round(fps))) if fps and not math.isnan(fps) else 25
                     # Generar video negro con audio silencioso para asegurar compatibilidad en la concatenación
+                    # Usamos parámetros explícitos para mayor compatibilidad entre versiones de FFmpeg
                     ff_cmd_black = [
                         "ffmpeg", "-y",
-                        "-f", "lavfi", "-i", f"color=size={w}x{h}:duration=5:rate={r}:color=black",
-                        "-f", "lavfi", "-i", "anullsrc=cl=stereo:sr=44100",
-                        "-c:v", "libx264", "-t", "5",
-                        "-c:a", "aac", "-pix_fmt", "yuv420p",
+                        "-f", "lavfi", "-i", f"color=color=black:size={w}x{h}:rate={r}:duration=5",
+                        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100:duration=5",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                        "-c:a", "aac", "-t", "5",
                         black_tmp
                     ]
                     # track this stage (expected duration is 5s)
