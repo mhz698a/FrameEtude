@@ -136,7 +136,13 @@ class FFmpegWorker(QtCore.QObject):
                 def run_and_track(cmd, expected_duration):
                     # start process
                     self._cancel_requested = False
-                    proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, universal_newlines=True, bufsize=1)
+                    # Hide console window on Windows
+                    creationflags = 0
+                    if sys.platform == "win32":
+                        creationflags = subprocess.CREATE_NO_WINDOW
+
+                    proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                                            universal_newlines=True, bufsize=1, creationflags=creationflags)
                     self._proc = proc
                     last_percent = 0
                     time_re = re.compile(r'time=(\d{2}:\d{2}:\d{2}(?:\.\d+)?)')
