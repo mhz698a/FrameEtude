@@ -43,6 +43,7 @@ class FFmpegWorker(QtCore.QObject):
     status = QtCore.pyqtSignal(str)          # status message
     finished = QtCore.pyqtSignal(str)       # output path
     error = QtCore.pyqtSignal(str)          # traceback or message
+    run_requested = QtCore.pyqtSignal(dict) # trigger
 
     def __init__(self):
         super().__init__()
@@ -246,19 +247,29 @@ class FFmpegWorker(QtCore.QObject):
                     # Diferente unidad o dispositivo, realizar copia por fragmentos
                     try:
                         size = os.path.getsize(final_output)
-                        with open(final_output, 'rb') as fsrc:
-                            with open(out_path, 'wb') as fdst:
-                                copied = 0
-                                while True:
-                                    buf = fsrc.read(1024*1024) # 1MB chunks
-                                    if not buf: break
-                                    fdst.write(buf)
-                                    copied += len(buf)
-                                    pct = int(copied * 100 / size) if size > 0 else 100
-                                    self.progress.emit(pct)
-                                    self.status.emit(f"Moviendo archivo... {pct}%")
+                        copied = 0
+                        with open(final_output, 'rb') as fsrc, open(out_path, 'wb') as fdst:
+                            while True:
+                                if self._cancel_requested:
+                                    break
+                                buf = fsrc.read(1024*1024) # 1MB chunks
+                                if not buf: break
+                                fdst.write(buf)
+                                copied += len(buf)
+                                pct = int(copied * 100 / size) if size > 0 else 100
+                                self.progress.emit(pct)
+                                self.status.emit(f"Moviendo archivo a destino... {pct}%")
+
+                        if self._cancel_requested:
+                            if os.path.exists(out_path):
+                                os.remove(out_path)
+                            raise Exception("Cancelado por el usuario durante el movimiento de archivo.")
+
                         os.remove(final_output)
                     except Exception as e:
+                        if os.path.exists(out_path) and copied < size:
+                            try: os.remove(out_path)
+                            except: pass
                         raise Exception(f"Error al mover el archivo final: {e}")
                 self.finished.emit(out_path)
             finally:

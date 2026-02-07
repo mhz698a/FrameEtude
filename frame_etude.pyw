@@ -250,35 +250,39 @@ class CutDialog(QtWidgets.QDialog):
     @QtCore.pyqtSlot(dict)
     def _start_ff_worker(self, params):
         # create worker and thread
-        worker = FFmpegWorker()
-        thread = QtCore.QThread()
-        worker.moveToThread(thread)
-        worker.progress.connect(self.progress.setValue)
-        worker.status.connect(self.progress.setFormat)
-        worker.finished.connect(self._on_finished)
-        worker.error.connect(self._on_error)
-        thread.started.connect(lambda: worker.run_cut(params))
+        self._ff_worker = FFmpegWorker()
+        self._ff_thread = QtCore.QThread()
 
-        # cleanup
-        def _cleanup():
-            try:
-                worker.deleteLater()
-            except Exception:
-                pass
-            try:
-                thread.quit()
-                thread.wait(1000)
-                thread.deleteLater()
-            except Exception:
-                pass
+        self._ff_worker.moveToThread(self._ff_thread)
 
-        worker.finished.connect(_cleanup)
-        worker.error.connect(_cleanup)
+        # Connect signals
+        self._ff_worker.progress.connect(self.progress.setValue)
+        self._ff_worker.status.connect(self.progress.setFormat)
+        self._ff_worker.finished.connect(self._on_finished)
+        self._ff_worker.error.connect(self._on_error)
 
-        # keep refs
-        self._ff_thread = thread
-        self._ff_worker = worker
-        thread.start()
+        # Connect the start signal to the worker's slot
+        # Since the worker is in another thread, this will be a QueuedConnection
+        self._ff_worker.run_requested.connect(self._ff_worker.run_cut)
+
+        # Cleanup logic
+        self._ff_worker.finished.connect(self._cleanup_ff_worker)
+        self._ff_worker.error.connect(self._cleanup_ff_worker)
+
+        self._ff_thread.start()
+
+        # Trigger the worker via signal (never call run_cut directly)
+        self._ff_worker.run_requested.emit(params)
+
+    def _cleanup_ff_worker(self):
+        if hasattr(self, '_ff_worker') and self._ff_worker:
+            self._ff_worker.deleteLater()
+            self._ff_worker = None
+        if hasattr(self, '_ff_thread') and self._ff_thread:
+            self._ff_thread.quit()
+            self._ff_thread.wait(2000)
+            self._ff_thread.deleteLater()
+            self._ff_thread = None
 
     @QtCore.pyqtSlot(str)
     def _on_finished(self, out_path):
