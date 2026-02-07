@@ -68,6 +68,24 @@ class FFmpegWorker(QtCore.QObject):
             width = int(params.get('width', 0))
             height = int(params.get('height', 0))
 
+            # Fallback a ffprobe si las dimensiones son 0
+            if width == 0 or height == 0:
+                try:
+                    cflags = 0
+                    if sys.platform == "win32":
+                        cflags = subprocess.CREATE_NO_WINDOW
+                    cmd_probe = [
+                        "ffprobe", "-v", "error", "-select_streams", "v:0",
+                        "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", in_path
+                    ]
+                    out_probe = subprocess.check_output(cmd_probe, creationflags=cflags).decode().strip()
+                    if 'x' in out_probe:
+                        w_p, h_p = out_probe.split('x')
+                        width = int(w_p)
+                        height = int(h_p)
+                except Exception:
+                    pass
+
             if end_sec <= start_sec:
                 raise ValueError("El tiempo final debe ser mayor que el inicio.")
 
@@ -209,12 +227,13 @@ class FFmpegWorker(QtCore.QObject):
                     w = width or 1280
                     h = height or 720
                     r = int(round(fps)) if fps and not math.isnan(fps) else 25
+                    # Generar video negro con audio silencioso para asegurar compatibilidad en la concatenación
                     ff_cmd_black = [
                         "ffmpeg", "-y",
-                        "-f", "lavfi",
-                        "-i", f"color=size={w}x{h}:duration=5:rate={r}:color=black",
+                        "-f", "lavfi", "-i", f"color=size={w}x{h}:duration=5:rate={r}:color=black",
+                        "-f", "lavfi", "-i", "anullsrc=cl=stereo:sr=44100",
                         "-c:v", "libx264", "-t", "5",
-                        "-pix_fmt", "yuv420p",
+                        "-c:a", "aac", "-pix_fmt", "yuv420p",
                         black_tmp
                     ]
                     # track this stage (expected duration is 5s)
@@ -223,8 +242,8 @@ class FFmpegWorker(QtCore.QObject):
                     # create concat list
                     list_file = os.path.join(tmpdir, "concat.txt")
                     with open(list_file, "w", encoding="utf-8") as f:
-                        f.write(f"file '{cut_tmp.replace('\\', '\\\\')}'\n")
-                        f.write(f"file '{black_tmp.replace('\\', '\\\\')}'\n")
+                        f.write(f"file '{cut_tmp.replace('\\', '/')}'\n")
+                        f.write(f"file '{black_tmp.replace('\\', '/')}'\n")
 
                     out_concat = os.path.join(tmpdir, "out_concat.mp4")
                     ff_cmd_concat = [
