@@ -40,17 +40,10 @@ class CutDialog(QtWidgets.QDialog):
         self.spin_deviation.setSingleStep(0.1)
         self.spin_deviation.setValue(-2.0)
         self.spin_deviation.setToolTip("Desviación de segundos para el inicio")
-        self.spin_deviation.valueChanged.connect(self._update_start_with_deviation)
 
         # Start input + button to use current timestamp
         h_start = QtWidgets.QHBoxLayout()
-        try:
-            self._base_start_sec = parse_time_to_seconds(default_start)
-            initial_start = format_time(max(0, self._base_start_sec + self.spin_deviation.value()))
-        except Exception:
-            self._base_start_sec = 0.0
-            initial_start = default_start
-        self.input_start = QtWidgets.QLineEdit(initial_start)
+        self.input_start = QtWidgets.QLineEdit(default_start)
         self.input_start.setToolTip("Inicio del recorte (hh:mm:ss.mmm)")
         h_start.addWidget(self.input_start)
         btn_start_now = QtWidgets.QPushButton("⤴")
@@ -143,31 +136,20 @@ class CutDialog(QtWidgets.QDialog):
         # signals
         self.start_cut_signal.connect(self._start_ff_worker)
 
-    def _update_start_with_deviation(self):
-        try:
-            val = max(0, self._base_start_sec + self.spin_deviation.value())
-            self.input_start.setText(format_time(val))
-        except Exception:
-            pass
-
     def _use_current_as_start(self):
         p = self.parent()
         if p is None:
             return
         cur = p.entry_time.text().strip() if getattr(p, 'entry_time', None) and p.entry_time.text().strip() else None
         if cur:
-            try:
-                self._base_start_sec = parse_time_to_seconds(cur)
-                self._update_start_with_deviation()
-            except Exception:
-                self.input_start.setText(cur)
+            self.input_start.setText(cur)
             return
         # fallback compute from frame
         try:
             frm = getattr(p, 'frame_actual', 0)
             fps = getattr(p, 'fps', 25.0) or 25.0
-            self._base_start_sec = frm / fps
-            self._update_start_with_deviation()
+            s = format_time(None, frame_num=frm, fps=fps)
+            self.input_start.setText(s)
         except Exception:
             pass
 
@@ -221,6 +203,11 @@ class CutDialog(QtWidgets.QDialog):
             e = self.input_end.text().strip()
             start_sec = parse_time_to_seconds(s)
             end_sec = parse_time_to_seconds(e)
+
+            # Aplicar desviación (ej: -2 segundos)
+            dev = self.spin_deviation.value()
+            start_sec = max(0, start_sec + dev)
+
             out_path = self.line_out.text().strip()
             if not out_path:
                 QtWidgets.QMessageBox.warning(self, "Aviso", "Selecciona una ruta de salida.")
