@@ -234,7 +234,26 @@ class FFmpegWorker(QtCore.QObject):
 
                 # Step 3: move final to out_path
                 self.status.emit("Moviendo archivo a destino...")
-                shutil.move(final_output, out_path)
+                try:
+                    os.rename(final_output, out_path)
+                except OSError:
+                    # Diferente unidad o dispositivo, realizar copia por fragmentos
+                    try:
+                        size = os.path.getsize(final_output)
+                        with open(final_output, 'rb') as fsrc:
+                            with open(out_path, 'wb') as fdst:
+                                copied = 0
+                                while True:
+                                    buf = fsrc.read(1024*1024) # 1MB chunks
+                                    if not buf: break
+                                    fdst.write(buf)
+                                    copied += len(buf)
+                                    pct = int(copied * 100 / size) if size > 0 else 100
+                                    self.progress.emit(pct)
+                                    self.status.emit(f"Moviendo archivo... {pct}%")
+                        os.remove(final_output)
+                    except Exception as e:
+                        raise Exception(f"Error al mover el archivo final: {e}")
                 self.finished.emit(out_path)
             finally:
                 try:
