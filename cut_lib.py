@@ -40,6 +40,7 @@ def get_real_start_for_copy(requested_start, keyframes, fps):
 
 class FFmpegWorker(QtCore.QObject):
     progress = QtCore.pyqtSignal(int)        # percent
+    status = QtCore.pyqtSignal(str)          # status message
     finished = QtCore.pyqtSignal(str)       # output path
     error = QtCore.pyqtSignal(str)          # traceback or message
 
@@ -58,7 +59,7 @@ class FFmpegWorker(QtCore.QObject):
         try:
             in_path = params['in_path']
             out_path = params['out_path']
-            start_sec = float(params['start_sec'] - 1.9)
+            start_sec = float(params['start_sec'])
             end_sec = float(params['end_sec'])
             optimize = bool(params.get('optimize_for_share', False))
             add_black = bool(params.get('add_black', False))
@@ -72,6 +73,8 @@ class FFmpegWorker(QtCore.QObject):
             total_expected = end_sec - start_sec
             if add_black:
                 total_expected += 5.0
+
+            self.status.emit("Iniciando recorte...")
 
             # Ensure output dir exists
             out_dir = os.path.dirname(out_path)
@@ -230,6 +233,7 @@ class FFmpegWorker(QtCore.QObject):
                     final_output = out_concat
 
                 # Step 3: move final to out_path
+                self.status.emit("Moviendo archivo a destino...")
                 shutil.move(final_output, out_path)
                 self.finished.emit(out_path)
             finally:

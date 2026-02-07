@@ -260,6 +260,7 @@ class CutDialog(QtWidgets.QDialog):
         thread = QtCore.QThread()
         worker.moveToThread(thread)
         worker.progress.connect(self.progress.setValue)
+        worker.status.connect(self.progress.setFormat)
         worker.finished.connect(self._on_finished)
         worker.error.connect(self._on_error)
         thread.started.connect(lambda: worker.run_cut(params))
@@ -288,7 +289,17 @@ class CutDialog(QtWidgets.QDialog):
     @QtCore.pyqtSlot(str)
     def _on_finished(self, out_path):
         self.progress.setValue(100)
-        QtWidgets.QMessageBox.information(self, "Recorte completado", f"Recorte guardado en:\n{out_path}")
+        self.progress.setFormat("Completado")
+
+        # Uso de mensaje no bloqueante (opcional, pero ayuda a que la interfaz "fluya")
+        msg = QtWidgets.QMessageBox(self)
+        msg.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        msg.setWindowModality(QtCore.Qt.NonModal)
+        msg.setWindowTitle("Recorte completado")
+        msg.setText(f"Recorte guardado en:\n{out_path}")
+        msg.setStandardButtons(QtWidgets.QMessageBox.Ok)
+        msg.show()
+
         self.btn_cut.setEnabled(True)
         self.btn_cancel.setEnabled(True)
         self._cut_started = False
