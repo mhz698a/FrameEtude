@@ -34,9 +34,21 @@ class CutDialog(QtWidgets.QDialog):
 
         form = QtWidgets.QFormLayout()
 
+        # Deviation input
+        self.spin_deviation = QtWidgets.QDoubleSpinBox()
+        self.spin_deviation.setRange(-999999.0, 999999.0)
+        self.spin_deviation.setSingleStep(0.1)
+        self.spin_deviation.setValue(-2.0)
+        self.spin_deviation.setToolTip("Desviación de segundos para el inicio")
+
         # Start input + button to use current timestamp
         h_start = QtWidgets.QHBoxLayout()
-        self.input_start = QtWidgets.QLineEdit(default_start)
+        try:
+            start_sec = parse_time_to_seconds(default_start)
+            initial_start = format_time(max(0, start_sec + self.spin_deviation.value()))
+        except Exception:
+            initial_start = default_start
+        self.input_start = QtWidgets.QLineEdit(initial_start)
         self.input_start.setToolTip("Inicio del recorte (hh:mm:ss.mmm)")
         h_start.addWidget(self.input_start)
         btn_start_now = QtWidgets.QPushButton("⤴")
@@ -83,6 +95,7 @@ class CutDialog(QtWidgets.QDialog):
         hbox_path.addWidget(btn_open_folder)
 
         form.addRow("Guardar en:", hbox_path)
+        form.addRow("Desviación inicio (seg):", self.spin_deviation)
 
         layout.addLayout(form)
 
@@ -134,14 +147,20 @@ class CutDialog(QtWidgets.QDialog):
             return
         cur = p.entry_time.text().strip() if getattr(p, 'entry_time', None) and p.entry_time.text().strip() else None
         if cur:
-            self.input_start.setText(cur)
+            try:
+                sec = parse_time_to_seconds(cur)
+                adjusted = format_time(max(0, sec + self.spin_deviation.value()))
+                self.input_start.setText(adjusted)
+            except Exception:
+                self.input_start.setText(cur)
             return
         # fallback compute from frame
         try:
             frm = getattr(p, 'frame_actual', 0)
             fps = getattr(p, 'fps', 25.0) or 25.0
-            s = format_time(None, frame_num=frm, fps=fps)
-            self.input_start.setText(s)
+            sec = frm / fps
+            adjusted = format_time(max(0, sec + self.spin_deviation.value()))
+            self.input_start.setText(adjusted)
         except Exception:
             pass
 
@@ -315,8 +334,14 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.combo_year.currentIndexChanged.connect(self.on_year_changed)
 
         left_layout.addWidget(QtWidgets.QLabel('Carpeta maestra (___[...])'))
-        self.combo_master = QtWidgets.QComboBox(); left_layout.addWidget(self.combo_master)
+        h_master = QtWidgets.QHBoxLayout()
+        self.combo_master = QtWidgets.QComboBox()
         self.combo_master.currentIndexChanged.connect(self.on_master_changed)
+        self.btn_rescan = QtWidgets.QPushButton("rescan")
+        self.btn_rescan.clicked.connect(lambda: self.on_master_changed(self.combo_master.currentIndex()))
+        h_master.addWidget(self.combo_master, 1)
+        h_master.addWidget(self.btn_rescan)
+        left_layout.addLayout(h_master)
 
         left_layout.addWidget(QtWidgets.QLabel('Archivos (selección única)'))
         self.list_files = QtWidgets.QListWidget()
