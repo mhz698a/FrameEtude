@@ -40,8 +40,10 @@ def get_real_start_for_copy(requested_start, keyframes, fps):
 
 class FFmpegWorker(QtCore.QObject):
     progress = QtCore.pyqtSignal(int)        # percent
+    status = QtCore.pyqtSignal(str)          # status message
     finished = QtCore.pyqtSignal(str)       # output path
     error = QtCore.pyqtSignal(str)          # traceback or message
+    run_requested = QtCore.pyqtSignal(dict) # trigger
 
     def __init__(self):
         super().__init__()
@@ -58,7 +60,7 @@ class FFmpegWorker(QtCore.QObject):
         try:
             in_path = params['in_path']
             out_path = params['out_path']
-            start_sec = float(params['start_sec'] - 1.9)
+            start_sec = float(params['start_sec'])
             end_sec = float(params['end_sec'])
             optimize = bool(params.get('optimize_for_share', False))
             add_black = bool(params.get('add_black', False))
@@ -66,12 +68,32 @@ class FFmpegWorker(QtCore.QObject):
             width = int(params.get('width', 0))
             height = int(params.get('height', 0))
 
+            # Fallback a ffprobe si las dimensiones son 0
+            if width == 0 or height == 0:
+                try:
+                    cflags = 0
+                    if sys.platform == "win32":
+                        cflags = subprocess.CREATE_NO_WINDOW
+                    cmd_probe = [
+                        "ffprobe", "-v", "error", "-select_streams", "v:0",
+                        "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", in_path
+                    ]
+                    out_probe = subprocess.check_output(cmd_probe, creationflags=cflags).decode().strip()
+                    if 'x' in out_probe:
+                        w_p, h_p = out_probe.split('x')
+                        width = int(w_p)
+                        height = int(h_p)
+                except Exception:
+                    pass
+
             if end_sec <= start_sec:
                 raise ValueError("El tiempo final debe ser mayor que el inicio.")
 
             total_expected = end_sec - start_sec
             if add_black:
                 total_expected += 5.0
+
+            self.status.emit("Iniciando recorte...")
 
             # Ensure output dir exists
             out_dir = os.path.dirname(out_path)
@@ -133,7 +155,13 @@ class FFmpegWorker(QtCore.QObject):
                 def run_and_track(cmd, expected_duration):
                     # start process
                     self._cancel_requested = False
-                    proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, universal_newlines=True, bufsize=1)
+                    # Hide console window on Windows
+                    creationflags = 0
+                    if sys.platform == "win32":
+                        creationflags = subprocess.CREATE_NO_WINDOW
+
+                    proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                                            universal_newlines=True, bufsize=1, creationflags=creationflags)
                     self._proc = proc
                     last_percent = 0
                     time_re = re.compile(r'time=(\d{2}:\d{2}:\d{2}(?:\.\d+)?)')
@@ -175,8 +203,12 @@ class FFmpegWorker(QtCore.QObject):
 
                     rc = proc.poll()
                     if rc not in (0, None):
-                        # read remaining stderr
-                        err = proc.stderr.read() if proc.stderr else ""
+                        # Capture any remaining output
+                        try:
+                            stdout_rem, stderr_rem = proc.communicate(timeout=2)
+                            err = (stderr_rem or "")
+                        except Exception:
+                            err = ""
                         raise Exception(f"ffmpeg returned {rc}. stderr:\n{err}")
 
                     # final update to 100% for this stage
@@ -196,15 +228,18 @@ class FFmpegWorker(QtCore.QObject):
                 if add_black:
                     black_tmp = os.path.join(tmpdir, "black.mp4")
                     # ensure width/height and fps known; fallback to 1280x720/fps if missing
-                    w = width or 1280
-                    h = height or 720
-                    r = int(round(fps)) if fps and not math.isnan(fps) else 25
+                    # Ensure even dimensions for libx264/yuv420p compatibility
+                    w = (width or 1280) // 2 * 2
+                    h = (height or 720) // 2 * 2
+                    r = max(1, int(round(fps))) if fps and not math.isnan(fps) else 25
+                    # Generar video negro con audio silencioso para asegurar compatibilidad en la concatenación
+                    # Usamos parámetros explícitos para mayor compatibilidad entre versiones de FFmpeg
                     ff_cmd_black = [
                         "ffmpeg", "-y",
-                        "-f", "lavfi",
-                        "-i", f"color=size={w}x{h}:duration=5:rate={r}:color=black",
-                        "-c:v", "libx264", "-t", "5",
-                        "-pix_fmt", "yuv420p",
+                        "-f", "lavfi", "-i", f"color=color=black:size={w}x{h}:rate={r}:duration=5",
+                        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100:duration=5",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                        "-c:a", "aac", "-t", "5",
                         black_tmp
                     ]
                     # track this stage (expected duration is 5s)
@@ -213,8 +248,8 @@ class FFmpegWorker(QtCore.QObject):
                     # create concat list
                     list_file = os.path.join(tmpdir, "concat.txt")
                     with open(list_file, "w", encoding="utf-8") as f:
-                        f.write(f"file '{cut_tmp.replace('\\', '\\\\')}'\n")
-                        f.write(f"file '{black_tmp.replace('\\', '\\\\')}'\n")
+                        f.write(f"file '{cut_tmp.replace('\\', '/')}'\n")
+                        f.write(f"file '{black_tmp.replace('\\', '/')}'\n")
 
                     out_concat = os.path.join(tmpdir, "out_concat.mp4")
                     ff_cmd_concat = [
@@ -230,7 +265,37 @@ class FFmpegWorker(QtCore.QObject):
                     final_output = out_concat
 
                 # Step 3: move final to out_path
-                shutil.move(final_output, out_path)
+                self.status.emit("Moviendo archivo a destino...")
+                try:
+                    os.rename(final_output, out_path)
+                except OSError:
+                    # Diferente unidad o dispositivo, realizar copia por fragmentos
+                    try:
+                        size = os.path.getsize(final_output)
+                        copied = 0
+                        with open(final_output, 'rb') as fsrc, open(out_path, 'wb') as fdst:
+                            while True:
+                                if self._cancel_requested:
+                                    break
+                                buf = fsrc.read(1024*1024) # 1MB chunks
+                                if not buf: break
+                                fdst.write(buf)
+                                copied += len(buf)
+                                pct = int(copied * 100 / size) if size > 0 else 100
+                                self.progress.emit(pct)
+                                self.status.emit(f"Moviendo archivo a destino... {pct}%")
+
+                        if self._cancel_requested:
+                            if os.path.exists(out_path):
+                                os.remove(out_path)
+                            raise Exception("Cancelado por el usuario durante el movimiento de archivo.")
+
+                        os.remove(final_output)
+                    except Exception as e:
+                        if os.path.exists(out_path) and copied < size:
+                            try: os.remove(out_path)
+                            except: pass
+                        raise Exception(f"Error al mover el archivo final: {e}")
                 self.finished.emit(out_path)
             finally:
                 try:

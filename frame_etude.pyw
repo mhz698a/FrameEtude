@@ -34,6 +34,13 @@ class CutDialog(QtWidgets.QDialog):
 
         form = QtWidgets.QFormLayout()
 
+        # Deviation input
+        self.spin_deviation = QtWidgets.QDoubleSpinBox()
+        self.spin_deviation.setRange(-999999.0, 999999.0)
+        self.spin_deviation.setSingleStep(0.1)
+        self.spin_deviation.setValue(-2.0)
+        self.spin_deviation.setToolTip("Desviación de segundos para el inicio")
+
         # Start input + button to use current timestamp
         h_start = QtWidgets.QHBoxLayout()
         self.input_start = QtWidgets.QLineEdit(default_start)
@@ -83,6 +90,7 @@ class CutDialog(QtWidgets.QDialog):
         hbox_path.addWidget(btn_open_folder)
 
         form.addRow("Guardar en:", hbox_path)
+        form.addRow("Desviación inicio (seg):", self.spin_deviation)
 
         layout.addLayout(form)
 
@@ -195,6 +203,11 @@ class CutDialog(QtWidgets.QDialog):
             e = self.input_end.text().strip()
             start_sec = parse_time_to_seconds(s)
             end_sec = parse_time_to_seconds(e)
+
+            # Aplicar desviación (ej: -2 segundos)
+            dev = self.spin_deviation.value()
+            start_sec = max(0, start_sec + dev)
+
             out_path = self.line_out.text().strip()
             if not out_path:
                 QtWidgets.QMessageBox.warning(self, "Aviso", "Selecciona una ruta de salida.")
@@ -237,39 +250,54 @@ class CutDialog(QtWidgets.QDialog):
     @QtCore.pyqtSlot(dict)
     def _start_ff_worker(self, params):
         # create worker and thread
-        worker = FFmpegWorker()
-        thread = QtCore.QThread()
-        worker.moveToThread(thread)
-        worker.progress.connect(self.progress.setValue)
-        worker.finished.connect(self._on_finished)
-        worker.error.connect(self._on_error)
-        thread.started.connect(lambda: worker.run_cut(params))
+        self._ff_worker = FFmpegWorker()
+        self._ff_thread = QtCore.QThread()
 
-        # cleanup
-        def _cleanup():
-            try:
-                worker.deleteLater()
-            except Exception:
-                pass
-            try:
-                thread.quit()
-                thread.wait(1000)
-                thread.deleteLater()
-            except Exception:
-                pass
+        self._ff_worker.moveToThread(self._ff_thread)
 
-        worker.finished.connect(_cleanup)
-        worker.error.connect(_cleanup)
+        # Connect signals
+        self._ff_worker.progress.connect(self.progress.setValue)
+        self._ff_worker.status.connect(self.progress.setFormat)
+        self._ff_worker.finished.connect(self._on_finished)
+        self._ff_worker.error.connect(self._on_error)
 
-        # keep refs
-        self._ff_thread = thread
-        self._ff_worker = worker
-        thread.start()
+        # Connect the start signal to the worker's slot
+        # Since the worker is in another thread, this will be a QueuedConnection
+        self._ff_worker.run_requested.connect(self._ff_worker.run_cut)
+
+        # Cleanup logic
+        self._ff_worker.finished.connect(self._cleanup_ff_worker)
+        self._ff_worker.error.connect(self._cleanup_ff_worker)
+
+        self._ff_thread.start()
+
+        # Trigger the worker via signal (never call run_cut directly)
+        self._ff_worker.run_requested.emit(params)
+
+    def _cleanup_ff_worker(self):
+        if hasattr(self, '_ff_worker') and self._ff_worker:
+            self._ff_worker.deleteLater()
+            self._ff_worker = None
+        if hasattr(self, '_ff_thread') and self._ff_thread:
+            self._ff_thread.quit()
+            self._ff_thread.wait(2000)
+            self._ff_thread.deleteLater()
+            self._ff_thread = None
 
     @QtCore.pyqtSlot(str)
     def _on_finished(self, out_path):
         self.progress.setValue(100)
-        QtWidgets.QMessageBox.information(self, "Recorte completado", f"Recorte guardado en:\n{out_path}")
+        self.progress.setFormat("Completado")
+
+        # Uso de mensaje no bloqueante (opcional, pero ayuda a que la interfaz "fluya")
+        msg = QtWidgets.QMessageBox(self)
+        msg.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        msg.setWindowModality(QtCore.Qt.NonModal)
+        msg.setWindowTitle("Recorte completado")
+        msg.setText(f"Recorte guardado en:\n{out_path}")
+        msg.setStandardButtons(QtWidgets.QMessageBox.Ok)
+        msg.show()
+
         self.btn_cut.setEnabled(True)
         self.btn_cancel.setEnabled(True)
         self._cut_started = False
@@ -315,8 +343,14 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.combo_year.currentIndexChanged.connect(self.on_year_changed)
 
         left_layout.addWidget(QtWidgets.QLabel('Carpeta maestra (___[...])'))
-        self.combo_master = QtWidgets.QComboBox(); left_layout.addWidget(self.combo_master)
+        h_master = QtWidgets.QHBoxLayout()
+        self.combo_master = QtWidgets.QComboBox()
         self.combo_master.currentIndexChanged.connect(self.on_master_changed)
+        self.btn_rescan = QtWidgets.QPushButton("rescan")
+        self.btn_rescan.clicked.connect(lambda: self.on_master_changed(self.combo_master.currentIndex()))
+        h_master.addWidget(self.combo_master, 1)
+        h_master.addWidget(self.btn_rescan)
+        left_layout.addLayout(h_master)
 
         left_layout.addWidget(QtWidgets.QLabel('Archivos (selección única)'))
         self.list_files = QtWidgets.QListWidget()
