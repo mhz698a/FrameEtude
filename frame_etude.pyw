@@ -29,6 +29,7 @@ class CutDialog(QtWidgets.QDialog):
         self.fps = fps
         self.width = width
         self.height = height
+        pywinstyles.change_header_color(self, color="#232629")
 
         layout = QtWidgets.QVBoxLayout(self)
 
@@ -203,11 +204,11 @@ class CutDialog(QtWidgets.QDialog):
             e = self.input_end.text().strip()
             start_sec = parse_time_to_seconds(s)
             end_sec = parse_time_to_seconds(e)
-
+            
             # Aplicar desviación (ej: -2 segundos)
             dev = self.spin_deviation.value()
             start_sec = max(0, start_sec + dev)
-
+            
             out_path = self.line_out.text().strip()
             if not out_path:
                 QtWidgets.QMessageBox.warning(self, "Aviso", "Selecciona una ruta de salida.")
@@ -252,25 +253,25 @@ class CutDialog(QtWidgets.QDialog):
         # create worker and thread
         self._ff_worker = FFmpegWorker()
         self._ff_thread = QtCore.QThread()
-
+        
         self._ff_worker.moveToThread(self._ff_thread)
-
+        
         # Connect signals
         self._ff_worker.progress.connect(self.progress.setValue)
         self._ff_worker.status.connect(self.progress.setFormat)
         self._ff_worker.finished.connect(self._on_finished)
         self._ff_worker.error.connect(self._on_error)
-
+        
         # Connect the start signal to the worker's slot
         # Since the worker is in another thread, this will be a QueuedConnection
         self._ff_worker.run_requested.connect(self._ff_worker.run_cut)
-
+        
         # Cleanup logic
         self._ff_worker.finished.connect(self._cleanup_ff_worker)
         self._ff_worker.error.connect(self._cleanup_ff_worker)
-
+        
         self._ff_thread.start()
-
+        
         # Trigger the worker via signal (never call run_cut directly)
         self._ff_worker.run_requested.emit(params)
 
@@ -288,7 +289,7 @@ class CutDialog(QtWidgets.QDialog):
     def _on_finished(self, out_path):
         self.progress.setValue(100)
         self.progress.setFormat("Completado")
-
+        
         # Uso de mensaje no bloqueante (opcional, pero ayuda a que la interfaz "fluya")
         msg = QtWidgets.QMessageBox(self)
         msg.setAttribute(QtCore.Qt.WA_DeleteOnClose)
@@ -322,7 +323,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.setMaximumSize(screen_w, screen_h)
         init_w = min(int(DEFAULT_THUMB_WIDTH * 1.6) + CONTROL_WIDTH_ESTIMATE, screen_w - 80)
         init_h = min(820, screen_h - 80)
-        self.resize(915, 500)
+        self.resize(915, 520)
         pywinstyles.change_header_color(self, color="#232629")
 
         # central layout: left panel + right main area
@@ -437,7 +438,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         # controls: actions (second row) -> here go Tm, Ex, CCR and checkboxes
         controls_actions = QtWidgets.QHBoxLayout()
         btn_copy_time = QtWidgets.QPushButton("Copy Timestamp"); btn_copy_time.clicked.connect(self.copy_time_to_clipboard); controls_actions.addWidget(btn_copy_time)
-        btn_export = QtWidgets.QPushButton("Ex"); btn_export.clicked.connect(self.export_frame_png); controls_actions.addWidget(btn_export)
+        btn_export = QtWidgets.QPushButton("Extract Frame"); btn_export.clicked.connect(self.export_frame_png); controls_actions.addWidget(btn_export)
 
         # OCR CCR button
         btn_ccr = QtWidgets.QPushButton("CCR")
@@ -861,17 +862,43 @@ class VideoEtude(QtWidgets.QMainWindow):
         if arr is None:
             QtWidgets.QMessageBox.warning(self, "Aviso", "No se pudo capturar el frame.")
             return
+
         img_pil = Image.fromarray(arr)
+
         downloads = os.path.join(os.path.expanduser("~"), "Downloads")
         now = datetime.datetime.now()
-        filename = now.strftime("%Y%m%d_%H%M%S") + ".png"
-        full = os.path.join(downloads, filename)
-        try:
-            img_pil.save(full, "PNG")
-            QtWidgets.QMessageBox.information(self, "Éxito", f"Fotograma exacto exportado como\n{full}")
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Error", f"No se pudo exportar la imagen.\n{e}")
+        filename_base = now.strftime("%Y%m%d_%H%M%S")
+        
+        tmp_path = os.path.join(downloads, filename_base + ".tmp")
+        final_path = os.path.join(downloads, filename_base + ".png")
 
+        try:
+            # Guardar primero como temporal
+            img_pil.save(tmp_path, "PNG")
+
+            # Renombrar de forma atómica a .png
+            os.replace(tmp_path, final_path)
+
+            QtWidgets.QMessageBox.information(
+                self,
+                "Éxito",
+                f"Fotograma exacto exportado como\n{final_path}"
+            )
+
+        except Exception as e:
+            # Si algo falla, eliminar el temporal si existe
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except:
+                    pass
+
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo exportar la imagen.\n{e}"
+            )
+            
     def copy_time_to_clipboard(self):
         t = self.entry_time.text().strip()
         if t:

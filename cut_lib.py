@@ -159,8 +159,8 @@ class FFmpegWorker(QtCore.QObject):
                     creationflags = 0
                     if sys.platform == "win32":
                         creationflags = subprocess.CREATE_NO_WINDOW
-
-                    proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                    
+                    proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, 
                                             universal_newlines=True, bufsize=1, creationflags=creationflags)
                     self._proc = proc
                     last_percent = 0
@@ -284,12 +284,12 @@ class FFmpegWorker(QtCore.QObject):
                                 pct = int(copied * 100 / size) if size > 0 else 100
                                 self.progress.emit(pct)
                                 self.status.emit(f"Moviendo archivo a destino... {pct}%")
-
+                        
                         if self._cancel_requested:
                             if os.path.exists(out_path):
                                 os.remove(out_path)
                             raise Exception("Cancelado por el usuario durante el movimiento de archivo.")
-
+                        
                         os.remove(final_output)
                     except Exception as e:
                         if os.path.exists(out_path) and copied < size:
