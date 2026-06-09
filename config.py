@@ -1,4 +1,6 @@
 # ---- Config ----
+from pathlib import Path
+
 DEFAULT_THUMB_WIDTH = 700
 THUMB_ASPECT = 9/16
 MIN_THUMB_WIDTH = 120
@@ -21,4 +23,6 @@ OCR_LANG = 'spa'           # idioma para tesseract
 
 BASE_INTERNAL_ROOT = r"E:\_Internal"  # ruta base para el panel izquierdo
 VIDEO_EXTS = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv'}
-ICON_PATH = r"C:\Users\miche\OneDrive\Overwrite Engine\vid_icon.ico"
+APP_DIR = Path(__file__).resolve().parent.as_posix()
+ICON_PATH = f"{APP_DIR}/assets/frameetude.ico"
+ID_APP = 'etude_video.FrameEtude.VideoFramesInspector.v2'

@@ -1,4 +1,4 @@
-from PyQt5 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtWidgets
 import numpy as np
 import cv2
 
@@ -102,39 +102,39 @@ class SelectionOverlay(QtWidgets.QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
-        self.setWindowFlags(QtCore.Qt.Widget | QtCore.Qt.FramelessWindowHint)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self.setWindowFlags(QtCore.Qt.WindowType.Widget | QtCore.Qt.WindowType.FramelessWindowHint)
         self.setMouseTracking(True)
-        self.rubber = QtWidgets.QRubberBand(QtWidgets.QRubberBand.Rectangle, self)
+        self.rubber = QtWidgets.QRubberBand(QtWidgets.QRubberBand.Shape.Rectangle, self)
         self.origin = None
         self.hide()
 
     def start(self):
-        self.setCursor(QtCore.Qt.CrossCursor)
+        self.setCursor(QtCore.Qt.CursorShape.CrossCursor)
         self.origin = None
         self.rubber.hide()
         self.show()
         self.raise_()
 
     def stop(self):
-        self.setCursor(QtCore.Qt.ArrowCursor)
+        self.setCursor(QtCore.Qt.CursorShape.ArrowCursor)
         self.origin = None
         self.rubber.hide()
         self.hide()
 
     def mousePressEvent(self, event):
-        if event.button() == QtCore.Qt.LeftButton:
-            self.origin = event.pos()
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            self.origin = event.position().toPoint()
             self.rubber.setGeometry(QtCore.QRect(self.origin, QtCore.QSize()))
             self.rubber.show()
 
     def mouseMoveEvent(self, event):
         if self.origin is not None:
-            rect = QtCore.QRect(self.origin, event.pos()).normalized()
+            rect = QtCore.QRect(self.origin, event.position().toPoint()).normalized()
             self.rubber.setGeometry(rect)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == QtCore.Qt.LeftButton and self.origin is not None:
+        if event.button() == QtCore.Qt.MouseButton.LeftButton and self.origin is not None:
             rect = self.rubber.geometry()
             self.rubber.hide()
             self.origin = None

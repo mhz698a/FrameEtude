@@ -1,6 +1,6 @@
 import collections, cv2
 from config import *
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 # -----------------------
 # Worker: ejecuta en su propio QThread y gestiona cv2.VideoCapture + cache + lectura secuencial

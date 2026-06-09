@@ -1,4 +1,4 @@
-from PyQt5 import QtCore, QtWidgets, QtGui
+from PyQt6 import QtCore, QtWidgets, QtGui
 
 # -----------------------
 # Curtain overlay and main UI
@@ -11,9 +11,9 @@ class CurtainOverlay(QtWidgets.QWidget):
         self.bottom = 0
         self.dragging = None
         self.setMouseTracking(True)
-        self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
-        self.setAttribute(QtCore.Qt.WA_StyledBackground, True)
-        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         self.hide()
 
     def set_geometry_height(self, x, y, w, h):
@@ -29,7 +29,7 @@ class CurtainOverlay(QtWidgets.QWidget):
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
         color = QtGui.QColor(0, 0, 0, 255)
         rect = QtCore.QRect(0, self.top, self.width(), max(0, self.bottom - self.top))
         painter.fillRect(rect, color)
@@ -41,7 +41,7 @@ class CurtainOverlay(QtWidgets.QWidget):
         painter.end()
 
     def mousePressEvent(self, event):
-        y = event.y()
+        y = int(event.position().y())
         if abs(y - self.top) < 10:
             self.dragging = 'top'
         elif abs(y - self.bottom) < 10:
@@ -50,8 +50,9 @@ class CurtainOverlay(QtWidgets.QWidget):
             self.dragging = None
 
     def mouseMoveEvent(self, event):
-        y = event.y()
+        y = int(event.position().y())
         h = self.height() or 1
+        
         if self.dragging == 'top':
             new_top = max(0, min(self.bottom - self.min_height, y))
             self.top = new_top
@@ -62,9 +63,10 @@ class CurtainOverlay(QtWidgets.QWidget):
             self.update()
         else:
             if abs(y - self.top) < 20 or abs(y - self.bottom) < 20:
-                self.setCursor(QtCore.Qt.SizeVerCursor)
+                self.setCursor(QtCore.Qt.CursorShape.SizeVerCursor)
             else:
-                self.setCursor(QtCore.Qt.ArrowCursor)
+                self.setCursor(QtCore.Qt.CursorShape.ArrowCursor)
+
 
     def mouseReleaseEvent(self, event):
         self.dragging = None

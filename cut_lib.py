@@ -4,7 +4,7 @@ import tempfile
 import shutil
 import traceback
 import math, re
-from PyQt5 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtWidgets
 from utils import *
 
 # -----------------------
