@@ -1,9 +1,11 @@
 import os, re, struct, datetime, cv2, win32clipboard
+import subprocess
 from PyQt6 import QtCore, QtGui, QtWidgets
 from ocr_lib import OCRWorker, SelectionOverlay
 from curtain_lib import CurtainOverlay
 from vidwk_lib import VideoWorker
 from cut_dialog_ex import CutDialog
+from file_table_widget import FileTableWidget
 from PIL import Image
 from config import *
 from utils import *
@@ -21,7 +23,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.setMaximumSize(screen_w, screen_h)
         init_w = min(int(DEFAULT_THUMB_WIDTH * 1.6) + CONTROL_WIDTH_ESTIMATE, screen_w - 80)
         init_h = min(820, screen_h - 80)
-        self.resize(915, 520)
+        self.resize(1200, 520)
 
         # central layout: left panel + right main area
         w = QtWidgets.QWidget()
@@ -32,6 +34,7 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         # ---------------- Left panel ----------------
         self.left_panel = QtWidgets.QWidget()
+        self.left_panel.setFixedWidth(550)
         left_layout = QtWidgets.QVBoxLayout(self.left_panel)
         left_layout.setContentsMargins(4,4,4,4)
         left_layout.setSpacing(6)
@@ -45,16 +48,15 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.combo_master = QtWidgets.QComboBox()
         self.combo_master.currentIndexChanged.connect(self.on_master_changed)
         self.btn_rescan = QtWidgets.QPushButton("rescan")
-        self.btn_rescan.clicked.connect(lambda: self.on_master_changed(self.combo_master.currentIndex()))
+        self.btn_rescan.clicked.connect(self.rescan_current_master_folder)
         h_master.addWidget(self.combo_master, 1)
         h_master.addWidget(self.btn_rescan)
         left_layout.addLayout(h_master)
 
         left_layout.addWidget(QtWidgets.QLabel('Archivos (selección única)'))
-        self.list_files = QtWidgets.QListWidget()
-        self.list_files.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
-        self.list_files.itemSelectionChanged.connect(self.on_file_selected)
-        left_layout.addWidget(self.list_files, 1)
+        self.file_table = FileTableWidget()
+        self.file_table.itemSelectionChanged.connect(self.on_file_selected)
+        left_layout.addWidget(self.file_table, 1)
         
         btns_left = QtWidgets.QHBoxLayout()
         self.btn_load_selected = QtWidgets.QPushButton('Load Selected')
@@ -62,14 +64,19 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_load_selected.setEnabled(False)
         btns_left.addWidget(self.btn_load_selected)
         
+        self.btn_edit_metadata = QtWidgets.QPushButton('Editar Metadatos')
+        self.btn_edit_metadata.setEnabled(False)
+        self.btn_edit_metadata.clicked.connect(self.edit_selected_metadata)
+        btns_left.addWidget(self.btn_edit_metadata)
+        
         self.btn_open_file = QtWidgets.QPushButton('Open other video')
         self.btn_open_file.clicked.connect(self.open_video_dialog)
         btns_left.addWidget(self.btn_open_file)
         left_layout.addLayout(btns_left)
         
         # Asegurarse de que el espacio debajo de los botones se distribuye correctamente
-        left_layout.setStretch(0, 0)  # El primer elemento (etiqueta) no se expande
-        left_layout.setStretch(1, 1)  # El QListWidget debe ocupar todo el espacio disponible
+        # left_layout.setStretch(0, 0)  # El primer elemento (etiqueta) no se expande
+        # left_layout.setStretch(1, 1)  # El QListWidget debe ocupar todo el espacio disponible
         
         # move original "Open Video" into left panel for backwards compatibility label
         # (we already have btn_open_file above)
@@ -171,7 +178,8 @@ class VideoEtude(QtWidgets.QMainWindow):
         controls_actions.addStretch(1)
         self.right_layout.addLayout(controls_actions)
 
-        self.status = QtWidgets.QLabel(""); self.right_layout.addWidget(self.status)
+        self.status = QtWidgets.QLabel("")
+        self.right_layout.addWidget(self.status)
 
         self.main_layout.addWidget(self.right_widget, 1)
 
@@ -270,41 +278,118 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.combo_master.addItem('(no encontrado)')
 
     def on_master_changed(self, idx):
-        self.list_files.clear()
+        path = self.combo_master.currentText()
+        if not path or path == '(no encontrado)':
+            self.file_table.load_folder("")
+            self.btn_load_selected.setEnabled(False)
+            return
+
+        base = path
+        if not os.path.isdir(base):
+            base = os.path.dirname(path)
+
+        self.file_table.load_folder(base)
+        self.btn_load_selected.setEnabled(False)
+
+    def rescan_current_master_folder(self):
         path = self.combo_master.currentText()
         if not path or path == '(no encontrado)':
             return
-        # if the combo contains full paths, use them
+
         base = path
         if not os.path.isdir(base):
-            # try splitting if stored as joined path
             base = os.path.dirname(path)
-        try:
-            files = [f for f in os.listdir(base) if os.path.isfile(os.path.join(base, f)) and os.path.splitext(f)[1].lower() in VIDEO_EXTS]
-            files_sorted = sorted(files)
-            for f in files_sorted:
-                item = QtWidgets.QListWidgetItem(f)
-                self.list_files.addItem(item)
-        except Exception:
-            pass
+
+        self.file_table.invalidate_folder(base)
+        self.on_master_changed(self.combo_master.currentIndex())
 
     def on_file_selected(self):
-        sel = self.list_files.selectedItems()
-        self.btn_load_selected.setEnabled(len(sel) == 1)
+        has_file = bool(self.file_table.current_file_path())
 
+        self.btn_load_selected.setEnabled(has_file)
+        self.btn_edit_metadata.setEnabled(has_file)
+        
     def load_selected_file(self):
-        sel = self.list_files.selectedItems()
-        if not sel:
+        video_path = self.file_table.current_file_path()
+        if not video_path:
             return
-        filename = sel[0].text()
-        base = self.combo_master.currentText()
-        video_path = os.path.join(base, filename) if os.path.isdir(base) else os.path.join(os.path.dirname(base), filename)
+
         if not os.path.exists(video_path):
             QtWidgets.QMessageBox.critical(self, 'Error', f'No se encontró: {video_path}')
             return
+
         self.start_worker_and_open(video_path)
-        # ensure curtain visible
         self.check_curtain.setChecked(True)
+
+    def edit_selected_metadata(self):
+        video_path = self.file_table.current_file_path()
+
+        if not video_path:
+            return
+
+        command = [
+            "pythonw",
+            r"C:\Users\miche\OneDrive\foobar2000\profile\ActivityBar\rename_dialog.py",
+            video_path,
+        ]
+
+        try:
+            process = subprocess.Popen(command)
+            process.wait()
+
+            self.rescan_selected_row()
+
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo abrir el editor de metadatos.\n\n{e}"
+            )
+    
+    def rescan_selected_row(self):
+        row = self.file_table.currentRow()
+
+        if row < 0:
+            return
+
+        video_path = self.file_table.current_file_path()
+
+        if not video_path:
+            return
+
+        try:
+            folder = os.path.dirname(video_path)
+
+            if folder in self.file_table._folder_cache:
+                cached_rows = self.file_table._folder_cache[folder]
+
+                for i, cached in enumerate(cached_rows):
+                    if cached.get("full_path") == video_path:
+                        cached_rows[i] = self.file_table._read_file_row(video_path)
+                        row_data = cached_rows[i]
+                        break
+                else:
+                    row_data = self.file_table._read_file_row(video_path)
+            else:
+                row_data = self.file_table._read_file_row(video_path)
+
+            for column, (_, key) in enumerate(self.file_table.COLUMNS):
+                item = self.file_table.item(row, column)
+
+                if item is None:
+                    item = QtWidgets.QTableWidgetItem()
+                    self.file_table.setItem(row, column, item)
+
+                item.setText(str(row_data.get(key, "")))
+
+                if column == 0:
+                    item.setData(
+                        QtCore.Qt.ItemDataRole.UserRole,
+                        row_data.get("full_path", "")
+                    )
+
+        except Exception:
+            pass
 
     # ---------------- UI <-> Worker lifecycle ----------------
     def open_video_dialog(self):
