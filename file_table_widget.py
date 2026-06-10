@@ -269,38 +269,63 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
     def contextMenuEvent(self, event: QtGui.QContextMenuEvent):
         pos = event.pos()
-        vh_w = self.verticalHeader().width()
-        hh_h = self.horizontalHeader().height()
 
-        corner = pos.x() < vh_w and pos.y() < hh_h
-        header = pos.y() < hh_h and pos.x() >= vh_w
-        cell = pos.y() >= hh_h and pos.x() >= vh_w
+        index = self.indexAt(pos)
+        corner = (
+            pos.x() < self.verticalHeader().width()
+            and pos.y() < self.horizontalHeader().height()
+        )
+        header = (
+            not index.isValid()
+            and pos.y() < self.horizontalHeader().height()
+        )
+
+        cell = index.isValid()
 
         menu = QtWidgets.QMenu(self)
 
-        if corner:
-            menu.addAction("Copiar toda la tabla", lambda: self.copy_all(False))
-            menu.addAction("Copiar toda la tabla con encabezados", lambda: self.copy_all(True))
-            menu.addSeparator()
-            menu.addAction("Ajustar todas las columnas al contenido", self.resize_all_columns_to_content)
-        elif header:
-            logical_col = self.horizontalHeader().logicalIndexAt(pos.x() - vh_w)
-            if logical_col >= 0:
-                header_text = self.horizontalHeaderItem(logical_col).text() if self.horizontalHeaderItem(logical_col) else ""
-                header_action = menu.addAction(f"Copiar encabezado: {header_text}")
-                header_action.triggered.connect(lambda _=False, t=header_text: self.copy_to_clipboard(t))
-                menu.addAction("Copiar columna completa", lambda col=logical_col: self.copy_column(col, include_header=True))
-                menu.addAction("Copiar columna sin encabezado", lambda col=logical_col: self.copy_column(col, include_header=False))
-                menu.addSeparator()
-                menu.addAction("Ajustar esta columna al contenido", lambda col=logical_col: self.resize_column_to_content(col))
-        elif cell:
-            index = self.indexAt(QtCore.QPoint(pos.x() - vh_w, pos.y() - hh_h))
+        if cell:
+            index = self.indexAt(pos)
             if index.isValid():
+                logical_col = index.column()
+                header_text = (
+                    self.horizontalHeaderItem(logical_col).text()
+                    if self.horizontalHeaderItem(logical_col)
+                    else ""
+                )
+
                 self.setCurrentCell(index.row(), index.column())
+
                 menu.addAction("Copiar celda", self.copy_current_cell)
                 menu.addAction("Copiar fila", self.copy_current_row)
                 menu.addSeparator()
-                menu.addAction("Copiar tabla con encabezados", lambda: self.copy_all(True))
+
+                header_action = menu.addAction(f"Copiar encabezado: {header_text}")
+                header_action.triggered.connect(
+                    lambda _=False, t=header_text: self.copy_to_clipboard(t)
+                )
+                menu.addAction(
+                    "Copiar columna completa",
+                    lambda col=logical_col: self.copy_column(col, include_header=True)
+                )
+                menu.addAction(
+                    "Copiar columna sin encabezado",
+                    lambda col=logical_col: self.copy_column(col, include_header=False)
+                )
+                menu.addSeparator()
+                menu.addAction(
+                    "Ajustar esta columna al contenido",
+                    lambda col=logical_col: self.resize_column_to_content(col)
+                )
+                menu.addAction(
+                    "Ajustar todas las columnas al contenido",
+                    self.resize_all_columns_to_content
+                )
+                menu.addSeparator()
+                menu.addAction(
+                    "Copiar tabla con encabezados",
+                    lambda: self.copy_all(True)
+                )
         else:
             return super().contextMenuEvent(event)
 
