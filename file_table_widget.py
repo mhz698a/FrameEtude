@@ -1,8 +1,16 @@
 import json
 import os
 from typing import Any
-
 from PyQt6 import QtCore, QtGui, QtWidgets
+
+from metadata_async_lib import MetadataSaveJob, MetadataSaveThread
+from metadata_edit_lib import (
+    COMMENT_KEYS,
+    ForeignCommentDialog,
+    comment_display_value,
+    comment_status_from_path,
+    save_mp4_updates,
+)
 
 try:
     from mutagen.mp4 import MP4
@@ -34,6 +42,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
         self._folder_cache: dict[str, list[dict[str, Any]]] = {}
         self._current_folder = ""
         self._settings = QtCore.QSettings("FrameEtude", "FileTableWidget")
+        self._metadata_thread = None
+        self.progress_bar = None
+        self.progress_label = None
 
         self.setColumnCount(len(self.COLUMNS))
         self.setHorizontalHeaderLabels([label for label, _ in self.COLUMNS])
@@ -110,22 +121,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         return ""
 
     def _comment_field(self, comment_raw: Any, key: str) -> str:
-        text = self._safe_text(comment_raw)
-        if not text:
-            return ""
-        try:
-            data = json.loads(text)
-        except Exception:
-            return ""
-        if not isinstance(data, dict):
-            return ""
-        value = data.get(key, "")
-        if key == "free_listener_times":
-            if isinstance(value, list):
-                items = [self._safe_text(v) for v in value if self._safe_text(v)]
-                return " / ".join(items)
-            return ""
-        return self._safe_text(value)
+        return comment_display_value(comment_raw, key)
 
     def _read_file_row(self, path: str) -> dict[str, Any]:
         row = self._empty_row()
@@ -215,6 +211,10 @@ class FileTableWidget(QtWidgets.QTableWidget):
             else QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
 
+    def set_progress_widgets(self, progress_bar, progress_label):
+        self.progress_bar = progress_bar
+        self.progress_label = progress_label
+
     def current_file_path(self) -> str:
         row = self.currentRow()
         if row < 0:
@@ -259,6 +259,261 @@ class FileTableWidget(QtWidgets.QTableWidget):
             rows.append([self.item(r, c).text() if self.item(r, c) else "" for c in range(self.columnCount())])
         self.copy_to_clipboard(self._tab_join_rows(rows))
 
+    def _path_for_row(self, row: int) -> str:
+        item = self.item(row, 0)
+        return self._safe_text(item.data(QtCore.Qt.ItemDataRole.UserRole) if item else "")
+
+    def _parse_clipboard_matrix(self) -> list[list[str]]:
+        text = QtWidgets.QApplication.clipboard().text()
+        if not text:
+            return []
+
+        normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+        lines = normalized.split("\n")
+        if lines and lines[-1] == "":
+            lines.pop()
+
+        if not lines:
+            return []
+
+        return [line.split("\t") for line in lines]
+
+    def _refresh_row_from_disk(self, row: int, path: str):
+        folder = os.path.dirname(path)
+        row_data = self._read_file_row(path)
+
+        if folder in self._folder_cache:
+            cached_rows = self._folder_cache[folder]
+            for i, cached in enumerate(cached_rows):
+                if cached.get("full_path") == path:
+                    cached_rows[i] = row_data
+                    break
+
+        for column, (_, key) in enumerate(self.COLUMNS):
+            item = self.item(row, column)
+            if item is None:
+                item = QtWidgets.QTableWidgetItem()
+                self.setItem(row, column, item)
+
+            item.setText(str(row_data.get(key, "")))
+
+            if column == 0:
+                item.setData(
+                    QtCore.Qt.ItemDataRole.UserRole,
+                    row_data.get("full_path", ""),
+                )
+
+    def _save_row_updates(self, row: int, updates_by_column: dict[int, str]) -> bool:
+        path = self._path_for_row(row)
+        if not path or not os.path.exists(path):
+            return False
+
+        updates_by_key: dict[str, str] = {}
+        for column, value in updates_by_column.items():
+            if 0 <= column < self.columnCount():
+                key = self.COLUMNS[column][1]
+                if key != "filename":
+                    updates_by_key[key] = value
+
+        if not updates_by_key:
+            return False
+
+        replace_foreign = False
+
+        if any(
+            self.COLUMNS[column][1] in COMMENT_KEYS
+            for column in updates_by_column
+        ):
+            status, existing_text = comment_status_from_path(path)
+
+            if status == "foreign":
+                dlg = ForeignCommentDialog(self, existing_text)
+
+                if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                    return False
+
+                replace_foreign = True
+
+        job = MetadataSaveJob(
+            row=row,
+            path=path,
+            updates=updates_by_key,
+            replace_foreign_comments=replace_foreign,
+        )
+
+        thread = MetadataSaveThread([job], self)
+        thread.progress.connect(self._on_metadata_progress)
+
+        thread.row_saved.connect(
+            lambda r, p, ok: (
+                self._refresh_row_from_disk(r, p)
+                if ok else None
+            )
+        )
+
+        thread.finished.connect(thread.deleteLater)
+
+        if not hasattr(self, "_metadata_threads"):
+            self._metadata_threads = []
+
+        self._metadata_threads.append(thread)
+
+        thread.finished.connect(
+            lambda t=thread: self._metadata_threads.remove(t)
+            if t in self._metadata_threads
+            else None
+        )
+
+        thread.start()
+
+        return True
+
+    def edit_current_cell(self):
+        item = self.currentItem()
+        row = self.currentRow()
+        column = self.currentColumn()
+        if item is None or row < 0 or column <= 0:
+            return
+
+        path = self._path_for_row(row)
+        if not path:
+            return
+
+        key = self.COLUMNS[column][1]
+        if key in COMMENT_KEYS:
+            status, existing_text = comment_status_from_path(path)
+            if status == "foreign":
+                dlg = ForeignCommentDialog(self, existing_text)
+                if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                    return
+
+        header_item = self.horizontalHeaderItem(column)
+        label = header_item.text() if header_item else "Valor"
+        value, ok = QtWidgets.QInputDialog.getText(
+            self,
+            "Editar esta celda",
+            label,
+            text=item.text(),
+        )
+        if not ok:
+            return
+
+        self._save_row_updates(row, {column: value})
+
+    def paste_from_first_cell(self):
+        self._paste_from_start(0, 0)
+
+    def paste_from_current_cell(self):
+        row = self.currentRow()
+        column = self.currentColumn()
+        if row < 0 or column < 0:
+            return
+        self._paste_from_start(row, column)
+        
+    def _paste_from_start(self, start_row: int, start_col: int):
+        matrix = self._parse_clipboard_matrix()
+        if not matrix:
+            return
+
+        jobs = []
+
+        for r_off, src_row in enumerate(matrix):
+            target_row = start_row + r_off
+
+            if target_row >= self.rowCount():
+                break
+
+            path = self._path_for_row(target_row)
+            if not path:
+                continue
+
+            updates_by_key = {}
+            replace_foreign = False
+
+            for c_off, value in enumerate(src_row):
+                target_col = start_col + c_off
+
+                if target_col >= self.columnCount():
+                    break
+
+                if target_col == 0:
+                    continue
+
+                key = self.COLUMNS[target_col][1]
+                updates_by_key[key] = value
+
+            if not updates_by_key:
+                continue
+
+            comment_columns = {
+                "real_ctime",
+                "real_mtime",
+                "after_of_episode",
+                "overwrite_1_times",
+                "overwrite_2_times",
+                "overwrite_3_times",
+                "free_listener_times",
+            }
+
+            if any(key in comment_columns for key in updates_by_key):
+                status, existing_text = comment_status_from_path(path)
+
+                if status == "foreign":
+                    dlg = ForeignCommentDialog(self, existing_text)
+
+                    if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                        return
+
+                    replace_foreign = True
+
+            jobs.append(
+                MetadataSaveJob(
+                    row=target_row,
+                    path=path,
+                    updates=updates_by_key,
+                    replace_foreign_comments=replace_foreign,
+                )
+            )
+
+        if not jobs:
+            return
+
+        thread = MetadataSaveThread(jobs, self)
+        thread.progress.connect(self._on_metadata_progress)
+
+        thread.row_saved.connect(
+            lambda r, p, ok: (
+                self._refresh_row_from_disk(r, p)
+                if ok else None
+            )
+        )
+
+        thread.finished.connect(thread.deleteLater)
+
+        if not hasattr(self, "_metadata_threads"):
+            self._metadata_threads = []
+
+        self._metadata_threads.append(thread)
+
+        thread.finished.connect(
+            lambda t=thread: self._metadata_threads.remove(t)
+            if t in self._metadata_threads
+            else None
+        )
+
+        thread.start()
+
+    def _on_metadata_progress(self, current: int, total: int, path: str):
+        if self.progress_bar is not None:
+            self.progress_bar.setMaximum(total)
+            self.progress_bar.setValue(current)
+
+        if self.progress_label is not None:
+            filename = os.path.basename(path)
+            self.progress_label.setText(
+                f"{current}/{total} - {filename}"
+            )
+
     def resize_column_to_content(self, column: int):
         if 0 <= column < self.columnCount():
             self.resizeColumnToContents(column)
@@ -295,6 +550,11 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 )
 
                 self.setCurrentCell(index.row(), index.column())
+                
+                menu.addAction("Editar esta celda", self.edit_current_cell)
+                menu.addAction("Pegar datos desde la primer celda", self.paste_from_first_cell)
+                menu.addAction("Pegar datos desde esta celda", self.paste_from_current_cell)
+                menu.addSeparator()
 
                 menu.addAction("Copiar celda", self.copy_current_cell)
                 menu.addAction("Copiar fila", self.copy_current_row)

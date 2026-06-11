@@ -21,9 +21,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         screen_w = screen.width()
         screen_h = screen.height()
         self.setMaximumSize(screen_w, screen_h)
-        init_w = min(int(DEFAULT_THUMB_WIDTH * 1.6) + CONTROL_WIDTH_ESTIMATE, screen_w - 80)
-        init_h = min(820, screen_h - 80)
-        self.resize(1200, 520)
+        self.resize(1200, 620)
 
         # central layout: left panel + right main area
         w = QtWidgets.QWidget()
@@ -58,29 +56,30 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.file_table.itemSelectionChanged.connect(self.on_file_selected)
         left_layout.addWidget(self.file_table, 1)
         
+        self.metadata_progress_label = QtWidgets.QLabel("0/0")
+        left_layout.addWidget(self.metadata_progress_label)
+
+        self.metadata_progress_bar = QtWidgets.QProgressBar()
+        self.metadata_progress_bar.setRange(0, 100)
+        self.metadata_progress_bar.setValue(0)
+        left_layout.addWidget(self.metadata_progress_bar)
+        
+        self.file_table.set_progress_widgets(
+            self.metadata_progress_bar,
+            self.metadata_progress_label,
+        )
+        
         btns_left = QtWidgets.QHBoxLayout()
         self.btn_load_selected = QtWidgets.QPushButton('Load Selected')
         self.btn_load_selected.clicked.connect(self.load_selected_file)
         self.btn_load_selected.setEnabled(False)
         btns_left.addWidget(self.btn_load_selected)
-        
-        self.btn_edit_metadata = QtWidgets.QPushButton('Editar Metadatos')
-        self.btn_edit_metadata.setEnabled(False)
-        self.btn_edit_metadata.clicked.connect(self.edit_selected_metadata)
-        btns_left.addWidget(self.btn_edit_metadata)
-        
+                
         self.btn_open_file = QtWidgets.QPushButton('Open other video')
         self.btn_open_file.clicked.connect(self.open_video_dialog)
         btns_left.addWidget(self.btn_open_file)
         left_layout.addLayout(btns_left)
         
-        # Asegurarse de que el espacio debajo de los botones se distribuye correctamente
-        # left_layout.setStretch(0, 0)  # El primer elemento (etiqueta) no se expande
-        # left_layout.setStretch(1, 1)  # El QListWidget debe ocupar todo el espacio disponible
-        
-        # move original "Open Video" into left panel for backwards compatibility label
-        # (we already have btn_open_file above)
-
         self.main_layout.addWidget(self.left_panel, 0)
 
         # ---------------- Right main area ----------------
@@ -307,7 +306,6 @@ class VideoEtude(QtWidgets.QMainWindow):
         has_file = bool(self.file_table.current_file_path())
 
         self.btn_load_selected.setEnabled(has_file)
-        self.btn_edit_metadata.setEnabled(has_file)
         
     def load_selected_file(self):
         video_path = self.file_table.current_file_path()
@@ -321,30 +319,6 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.start_worker_and_open(video_path)
         self.check_curtain.setChecked(True)
 
-    def edit_selected_metadata(self):
-        video_path = self.file_table.current_file_path()
-
-        if not video_path:
-            return
-
-        command = [
-            "pythonw",
-            r"C:\Users\miche\OneDrive\foobar2000\profile\ActivityBar\rename_dialog.py",
-            video_path,
-        ]
-
-        try:
-            process = subprocess.Popen(command)
-            process.wait()
-
-            self.rescan_selected_row()
-
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(
-                self,
-                "Error",
-                f"No se pudo abrir el editor de metadatos.\n\n{e}"
-            )
     
     def rescan_selected_row(self):
         row = self.file_table.currentRow()
@@ -620,8 +594,12 @@ class VideoEtude(QtWidgets.QMainWindow):
             got.update(frames_dict)
             loop.quit()
         self.worker.frames_ready.connect(_on)
-        QtCore.QMetaObject.invokeMethod(self.worker, "request_frames", QtCore.Qt.ConnectionType.QueuedConnection,
-                                        QtCore.Q_ARG(int, frame_num), QtCore.Q_ARG(bool, False))
+        QtCore.QMetaObject.invokeMethod(
+            self.worker, "request_frames", 
+            QtCore.Qt.ConnectionType.QueuedConnection,
+            QtCore.Q_ARG(int, frame_num), 
+            QtCore.Q_ARG(bool, False)
+            )
         timer = QtCore.QTimer()
         timer.setSingleShot(True)
         timer.timeout.connect(loop.quit)
@@ -872,3 +850,28 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         dlg = CutDialog(self, self.worker.path, default_start, default_end, fps, width, height)
         dlg.show()
+
+    def edit_selected_metadata(self):
+        video_path = self.file_table.current_file_path()
+
+        if not video_path:
+            return
+
+        command = [
+            "pythonw",
+            r"C:\Users\miche\OneDrive\foobar2000\profile\ActivityBar\rename_dialog.py",
+            video_path,
+        ]
+
+        try:
+            process = subprocess.Popen(command)
+            process.wait()
+
+            self.rescan_selected_row()
+
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo abrir el editor de metadatos.\n\n{e}"
+            )
