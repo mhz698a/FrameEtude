@@ -1,5 +1,6 @@
 import json
 import os
+import datetime
 from typing import Any
 from PyQt6 import QtCore, QtGui, QtWidgets
 
@@ -43,6 +44,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
         self._current_folder = ""
         self._settings = QtCore.QSettings("FrameEtude", "FileTableWidget")
         self._metadata_thread = None
+        self._progress_reset_timer = QtCore.QTimer(self)
+        self._progress_reset_timer.setSingleShot(True)
+        self._progress_reset_timer.timeout.connect(self._reset_metadata_progress)
         self.progress_bar = None
         self.progress_label = None
 
@@ -278,6 +282,92 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         return [line.split("\t") for line in lines]
 
+    def _filesystem_timestamp_text(self, path: str, kind: str) -> str:
+        try:
+            st = os.stat(path)
+            ts = st.st_ctime if kind == "ctime" else st.st_mtime
+            return datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return ""
+
+    def _run_metadata_jobs(self, jobs: list[MetadataSaveJob]) -> None:
+        if not jobs:
+            return
+
+        thread = MetadataSaveThread(jobs, self)
+        thread.progress.connect(self._on_metadata_progress)
+        thread.row_saved.connect(
+            lambda r, p, ok: (
+                self._refresh_row_from_disk(r, p)
+                if ok else None
+            )
+        )
+        thread.finished.connect(thread.deleteLater)
+
+        if not hasattr(self, "_metadata_threads"):
+            self._metadata_threads = []
+
+        self._metadata_threads.append(thread)
+        thread.finished.connect(
+            lambda t=thread: self._metadata_threads.remove(t)
+            if t in self._metadata_threads
+            else None
+        )
+        thread.start()
+
+    def _save_filesystem_times_from_column(self, target_key: str) -> None:
+        if self.rowCount() <= 0:
+            return
+
+        title = "Obtener y pegar ctime" if target_key == "real_ctime" else "Obtener y pegar mtime"
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            title,
+            "Esto aplicará el cambio desde la primera fila hasta la última.\n¿Continuar?",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No,
+        )
+        if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+            return
+
+        ts_kind = "ctime" if target_key == "real_ctime" else "mtime"
+        jobs: list[MetadataSaveJob] = []
+
+        for row in range(self.rowCount()):
+            path = self._path_for_row(row)
+            if not path or not os.path.exists(path):
+                continue
+
+            value = self._filesystem_timestamp_text(path, ts_kind)
+            if not value:
+                continue
+
+            replace_foreign = False
+            status, existing_text = comment_status_from_path(path)
+            if status == "foreign":
+                dlg = ForeignCommentDialog(self, existing_text)
+                if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                    return
+                replace_foreign = True
+
+            jobs.append(
+                MetadataSaveJob(
+                    row=row,
+                    path=path,
+                    updates={target_key: value},
+                    replace_foreign_comments=replace_foreign,
+                )
+            )
+
+        self._run_metadata_jobs(jobs)
+
+    def _reset_metadata_progress(self) -> None:
+        if self.progress_bar is not None:
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(0)
+        if self.progress_label is not None:
+            self.progress_label.setText("0/0")
+
     def _refresh_row_from_disk(self, row: int, path: str):
         folder = os.path.dirname(path)
         row_data = self._read_file_row(path)
@@ -510,9 +600,12 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         if self.progress_label is not None:
             filename = os.path.basename(path)
-            self.progress_label.setText(
-                f"{current}/{total} - {filename}"
-            )
+            self.progress_label.setText(f"{current}/{total} - {filename}")
+
+        if current >= total and total > 0:
+            self._progress_reset_timer.start(10000)
+        elif self._progress_reset_timer.isActive():
+            self._progress_reset_timer.stop()
 
     def resize_column_to_content(self, column: int):
         if 0 <= column < self.columnCount():
@@ -564,6 +657,18 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 header_action.triggered.connect(
                     lambda _=False, t=header_text: self.copy_to_clipboard(t)
                 )
+                
+                if logical_col in (8, 9):
+                    menu.addSeparator()
+                    menu.addAction(
+                        "Obtener y pegar ctime",
+                        lambda: self._save_filesystem_times_from_column("real_ctime")
+                    )
+                    menu.addAction(
+                        "Obtener y pegar mtime",
+                        lambda: self._save_filesystem_times_from_column("real_mtime")
+                    )
+                
                 menu.addAction(
                     "Copiar columna completa",
                     lambda col=logical_col: self.copy_column(col, include_header=True)

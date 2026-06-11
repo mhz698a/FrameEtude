@@ -1,5 +1,4 @@
-import os, re, struct, datetime, cv2, win32clipboard
-import subprocess
+import os, re, struct, datetime, cv2, win32clipboard, subprocess
 from PyQt6 import QtCore, QtGui, QtWidgets
 from ocr_lib import OCRWorker, SelectionOverlay
 from curtain_lib import CurtainOverlay
