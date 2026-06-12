@@ -1,6 +1,7 @@
 import re
 from datetime import datetime, timedelta, timezone
 
+
 def is_standardized(time_range: str) -> bool:
     """
     Comprueba si el rango de tiempo ya cuenta con el formato estandarizado:
@@ -13,7 +14,8 @@ def is_standardized(time_range: str) -> bool:
     )
     return bool(re.match(pattern, time_range))
 
-def standardize_time_range(time_range: str, disable_z_ajust: bool = False) -> str:
+
+def standardize_time_range(time_range: str, disable_z_ajust: bool = False, regu_propio: bool = False) -> str:
     """
     Transforma un rango de tiempo en formato propio a ISO 8601 estándar con timezone -06:00.
     """
@@ -22,6 +24,9 @@ def standardize_time_range(time_range: str, disable_z_ajust: bool = False) -> st
         return time_range
         
     # Caso 1: Formato "AAAA-MM-DD HH:MM:SS-HH:MM:SS"
+    if not regu_propio:
+        return time_range
+    
     match_custom1 = re.match(r"^(\d{4}-\d{2}-\d{2})\s(\d{2}:\d{2}:\d{2})-(\d{2}:\d{2}:\d{2})$", time_range)
     if match_custom1:
         date_str, start_time_str, end_time_str = match_custom1.groups()
@@ -74,7 +79,7 @@ def standardize_time_range(time_range: str, disable_z_ajust: bool = False) -> st
 if __name__ == "__main__":
     # Prueba 1: Tu caso específico de cruce de medianoche
     test_1 = "2023-01-07 11:58:19-00:22:31"
-    print(f"Original: {test_1}\nEstandarizado: {standardize_time_range(test_1)}\n")
+    print(f"Original: {test_1}\nEstandarizado: {standardize_time_range(test_1, False)}\n")
     
     # Prueba 2: Caso de formato UTC (Z) convirtiendo a -06:00 
     # (Restará 6 horas matemáticamente a la fecha)
