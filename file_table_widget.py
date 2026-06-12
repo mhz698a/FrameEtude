@@ -1,8 +1,7 @@
-import json
-import os
-import datetime
+import json, os, datetime, subprocess
 from typing import Any
 from PyQt6 import QtCore, QtGui, QtWidgets
+from config import RENAME_DIALOG_EXE, RENAME_DIALOG_SCRIPT
 
 from metadata_async_lib import MetadataSaveJob, MetadataSaveThread
 from metadata_edit_lib import (
@@ -10,7 +9,6 @@ from metadata_edit_lib import (
     ForeignCommentDialog,
     comment_display_value,
     comment_status_from_path,
-    save_mp4_updates,
 )
 
 try:
@@ -683,6 +681,11 @@ class FileTableWidget(QtWidgets.QTableWidget):
                     "Copiar tabla con encabezados",
                     lambda: self.copy_all(True)
                 )
+                
+                menu.addSeparator()
+                menu.addAction("Copiar Ruta de este archivo", self.copy_current_file_path)
+                menu.addAction("Abrir este archivo con rename dialog", self.open_current_file_with_rename_dialog)
+                menu.addAction("Abrir este archivo", self.open_current_file)
         else:
             return super().contextMenuEvent(event)
 
@@ -691,3 +694,29 @@ class FileTableWidget(QtWidgets.QTableWidget):
             event.accept()
             return
         super().contextMenuEvent(event)
+
+    def copy_current_file_path(self):
+        path = self.current_file_path()
+        if path:
+            QtWidgets.QApplication.clipboard().setText(path)
+
+    def open_current_file_with_rename_dialog(self):
+        path = self.current_file_path()
+        if not path:
+            return
+
+        command = [RENAME_DIALOG_EXE, RENAME_DIALOG_SCRIPT, path]
+
+        try:
+            subprocess.Popen(command)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Error",
+                f"No se pudo abrir rename dialog.\n\n{e}",
+            )
+
+    def open_current_file(self):
+        main_window = self.window()
+        if hasattr(main_window, "load_selected_file"):
+            main_window.load_selected_file()

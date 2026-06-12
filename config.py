@@ -26,3 +26,7 @@ VIDEO_EXTS = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv'}
 APP_DIR = Path(__file__).resolve().parent.as_posix()
 ICON_PATH = f"{APP_DIR}/assets/frameetude.ico"
 ID_APP = 'etude_video.FrameEtude.VideoFramesInspector.v2'
+
+# -----------------------------------------------------------------------
+RENAME_DIALOG_EXE = "pythonw"
+RENAME_DIALOG_SCRIPT = r"C:\Users\miche\OneDrive\foobar2000\profile\ActivityBar\rename_dialog.py"

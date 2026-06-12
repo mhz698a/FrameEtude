@@ -79,6 +79,10 @@ class VideoEtude(QtWidgets.QMainWindow):
         btns_left.addWidget(self.btn_open_file)
         left_layout.addLayout(btns_left)
         
+        self.btn_toggle_workframe = QtWidgets.QPushButton('Hide/Show Workframe')
+        self.btn_toggle_workframe.clicked.connect(self.toggle_workframe_visibility)
+        btns_left.addWidget(self.btn_toggle_workframe)
+        
         self.main_layout.addWidget(self.left_panel, 0)
 
         # ---------------- Right main area ----------------
@@ -129,6 +133,7 @@ class VideoEtude(QtWidgets.QMainWindow):
                           ("-01", lambda: self.move_seconds(-1)), 
                           ("-Fr1", lambda: self.move_frame(-1))]:
             b = QtWidgets.QPushButton(txt); b.clicked.connect(func); controls_nav.addWidget(b)
+        
         self.entry_time = QtWidgets.QLineEdit(); self.entry_time.setFixedWidth(140); self.entry_time.returnPressed.connect(self.go_to_time)
         controls_nav.addWidget(self.entry_time)
         for txt, func in [("+Fr1", lambda: self.move_frame(1)), 
@@ -315,6 +320,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.critical(self, 'Error', f'No se encontró: {video_path}')
             return
 
+        self.ensure_workframe_visible()
         self.start_worker_and_open(video_path)
         self.check_curtain.setChecked(True)
 
@@ -366,9 +372,12 @@ class VideoEtude(QtWidgets.QMainWindow):
 
     # ---------------- UI <-> Worker lifecycle ----------------
     def open_video_dialog(self):
-        path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open Video", "", "Video files (*.mp4 *.avi *.mov *.mkv *.wmv *.flv)")
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Open Video", "", "Video files (*.mp4 *.avi *.mov *.mkv *.wmv *.flv)"
+            )
         if not path:
             return
+        self.ensure_workframe_visible()
         self.start_worker_and_open(path)
         self.check_curtain.setChecked(True)
 
@@ -850,27 +859,53 @@ class VideoEtude(QtWidgets.QMainWindow):
         dlg = CutDialog(self, self.worker.path, default_start, default_end, fps, width, height)
         dlg.show()
 
+    
     def edit_selected_metadata(self):
         video_path = self.file_table.current_file_path()
-
         if not video_path:
             return
 
-        command = [
-            "pythonw",
-            r"C:\Users\miche\OneDrive\foobar2000\profile\ActivityBar\rename_dialog.py",
-            video_path,
-        ]
+        command = [RENAME_DIALOG_EXE, RENAME_DIALOG_SCRIPT, video_path]
 
         try:
-            process = subprocess.Popen(command)
-            process.wait()
-
-            self.rescan_selected_row()
-
+            subprocess.Popen(command)
         except Exception as e:
             QtWidgets.QMessageBox.critical(
                 self,
                 "Error",
-                f"No se pudo abrir el editor de metadatos.\n\n{e}"
+                f"No se pudo abrir el editor de metadatos.\n\n{e}",
             )
+
+    def ensure_workframe_visible(self):
+        if not self.right_widget.isVisible():
+            self.toggle_workframe_visibility()
+
+    def toggle_workframe_visibility(self):
+        self.right_widget.setVisible(not self.right_widget.isVisible())
+        self._set_workframe_visible(self.right_widget.isVisible())
+
+    def _set_workframe_visible(self, visible: bool):
+        
+        if visible:
+            self.left_panel.setFixedWidth(550)
+            self.left_panel.setSizePolicy(
+                QtWidgets.QSizePolicy.Policy.Fixed,
+                QtWidgets.QSizePolicy.Policy.Preferred,
+            )
+            self.main_layout.setStretch(0, 0)
+            self.main_layout.setStretch(1, 1)
+        else:
+            self.left_panel.setMinimumWidth(0)
+            self.left_panel.setMaximumWidth(16777215)
+            self.left_panel.setSizePolicy(
+                QtWidgets.QSizePolicy.Policy.Expanding,
+                QtWidgets.QSizePolicy.Policy.Preferred,
+            )
+            self.main_layout.setStretch(0, 1)
+            self.main_layout.setStretch(1, 0)
+            
+
+        self.left_panel.updateGeometry()
+        self.right_widget.updateGeometry()
+        self.main_layout.invalidate()
+        self.centralWidget().updateGeometry()
