@@ -4,7 +4,6 @@ import json
 import os
 import re
 from typing import Any
-
 from PyQt6 import QtWidgets
 
 try:
@@ -12,10 +11,9 @@ try:
 except Exception:
     MP4 = None
 
-try:
-    from wctime import setctime_blocking
-except Exception:
-    setctime_blocking = None
+from wctime import setctime_blocking
+from isodatetimerng import standardize_time_range
+
 
 
 COMMENT_KEYS = [
@@ -137,6 +135,13 @@ def _normalize_free_listener_value(value: Any) -> list[str]:
 def _normalize_comment_value(key: str, value: Any) -> Any:
     if key == "free_listener_times":
         return _normalize_free_listener_value(value)
+
+    if key in {"overwrite_1_times", "overwrite_2_times", "overwrite_3_times"}:
+        text = _safe_text(value)
+        if text:
+            return standardize_time_range(text)
+        return ""
+
     return _safe_text(value)
 
 
@@ -238,7 +243,8 @@ def save_mp4_updates(
     updates: dict[str, Any],
     *,
     replace_foreign_comments: bool = False,
-) -> None:
+) -> str:
+    
     if MP4 is None:
         raise RuntimeError("mutagen.mp4 no está disponible.")
 
@@ -255,6 +261,9 @@ def save_mp4_updates(
         mp4.add_tags()
 
     tags = mp4.tags
+
+    filename_value = _safe_text(updates.get("filename", ""))
+    rename_base = os.path.splitext(filename_value)[0] if filename_value else ""
 
     comment_updates = {
         key: value for key, value in updates.items() if key in COMMENT_KEYS
@@ -292,6 +301,17 @@ def save_mp4_updates(
             _set_text_tag(tags, atom, value)
 
     mp4.save(path)
+    
+    if rename_base:
+        folder = os.path.dirname(path)
+        ext = os.path.splitext(path)[1]
+        new_path = os.path.join(folder, f"{rename_base}{ext}")
+
+        if os.path.normcase(new_path) != os.path.normcase(path):
+            if os.path.exists(new_path):
+                raise FileExistsError(new_path)
+            os.rename(path, new_path)
+            path = new_path
 
     try:
         os.utime(path, (old_atime, old_mtime))
@@ -303,3 +323,5 @@ def save_mp4_updates(
             setctime_blocking(path, old_ctime)
         except Exception:
             pass
+    
+    return path

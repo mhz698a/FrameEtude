@@ -27,7 +27,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         ("Artista (Root Season)", "artist"),
         ("Track (EpNum)", "track"),
         ("Release Date", "release_date"),
-        ("Disk (SeasonNum)", "disk"),
+        ("Disk (SeNum)", "disk"),
         ("Genre (Type)", "genre"),
         ("Real Created", "real_ctime"),
         ("Real Modified", "real_mtime"),
@@ -402,8 +402,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         for column, value in updates_by_column.items():
             if 0 <= column < self.columnCount():
                 key = self.COLUMNS[column][1]
-                if key != "filename":
-                    updates_by_key[key] = value
+                updates_by_key[key] = value
 
         if not updates_by_key:
             return False
@@ -490,16 +489,13 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         self._save_row_updates(row, {column: value})
 
-    def paste_from_first_cell(self):
-        self._paste_from_start(0, 0)
-
     def paste_from_current_cell(self):
         row = self.currentRow()
         column = self.currentColumn()
         if row < 0 or column < 0:
             return
         self._paste_from_start(row, column)
-        
+
     def _paste_from_start(self, start_row: int, start_col: int):
         matrix = self._parse_clipboard_matrix()
         if not matrix:
@@ -525,9 +521,6 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
                 if target_col >= self.columnCount():
                     break
-
-                if target_col == 0:
-                    continue
 
                 key = self.COLUMNS[target_col][1]
                 updates_by_key[key] = value
@@ -645,7 +638,6 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 self.setCurrentCell(index.row(), index.column())
                 
                 menu.addAction("Editar esta celda", self.edit_current_cell)
-                menu.addAction("Pegar datos desde la primer celda", self.paste_from_first_cell)
                 menu.addAction("Pegar datos desde esta celda", self.paste_from_current_cell)
                 menu.addSeparator()
 

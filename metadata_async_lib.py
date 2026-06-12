@@ -1,10 +1,7 @@
 from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
-
 from PyQt6 import QtCore
-
 from metadata_edit_lib import save_mp4_updates
 
 
@@ -34,20 +31,21 @@ class MetadataSaveThread(QtCore.QThread):
         for index, job in enumerate(self._jobs, start=1):
             if self.isInterruptionRequested():
                 break
-
+            
+            saved_path = job.path
             try:
-                save_mp4_updates(
+                saved_path = save_mp4_updates(
                     job.path,
                     job.updates,
                     replace_foreign_comments=job.replace_foreign_comments,
                 )
                 saved_rows.append(job.row)
                 ok_count += 1
-                self.row_saved.emit(job.row, job.path, True)
+                self.row_saved.emit(job.row, saved_path, True)
             except Exception:
                 fail_count += 1
                 self.row_saved.emit(job.row, job.path, False)
 
-            self.progress.emit(index, total, job.path)
+            self.progress.emit(index, total, saved_path)
 
         self.finished_batch.emit(saved_rows, ok_count, fail_count)
