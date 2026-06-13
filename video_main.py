@@ -68,6 +68,21 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.metadata_progress_label,
         )
         
+        overwrite_btns = QtWidgets.QHBoxLayout()
+        botones_config = [
+            ('Overwrite P', OVERWRITE_0),
+            ('Overwrite I', OVERWRITE_1),
+            ('Overwrite II', OVERWRITE_2),
+            ('Overwrite III', OVERWRITE_3)
+        ]
+
+        for texto, constante in botones_config:
+            btn = QtWidgets.QPushButton(texto)
+            btn.clicked.connect(lambda checked, c=constante: self.showOverwriteInfo(c))
+            overwrite_btns.addWidget(btn)
+
+        left_layout.addLayout(overwrite_btns)
+        
         btns_left = QtWidgets.QHBoxLayout()
         self.btn_load_selected = QtWidgets.QPushButton('Load Selected')
         self.btn_load_selected.clicked.connect(self.load_selected_file)
@@ -220,6 +235,12 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.populate_years()
         except Exception:
             pass
+
+    def showOverwriteInfo(self, times_num: tuple):
+        QtWidgets.QMessageBox.information(
+            self, f"Overwrite {times_num[0]} Review: {times_num[1]}", times_num[2]
+        )
+
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
