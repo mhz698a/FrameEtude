@@ -5,6 +5,7 @@ from curtain_lib import CurtainOverlay
 from vidwk_lib import VideoWorker
 from cut_dialog_ex import CutDialog
 from file_table_widget import FileTableWidget
+from smb_dialog import SMBDialog
 from PIL import Image
 from config import *
 from utils import *
@@ -99,6 +100,10 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_open_file.clicked.connect(self.open_video_dialog)
         btns_left.addWidget(self.btn_open_file)
         left_layout.addLayout(btns_left)
+        
+        self.btn_check_smb = QtWidgets.QPushButton('Check SMB')
+        self.btn_check_smb.clicked.connect(self.open_smb_dialog)
+        btns_left.addWidget(self.btn_check_smb)
         
         self.btn_toggle_workframe = QtWidgets.QPushButton('Hide/Show Workframe')
         self.btn_toggle_workframe.clicked.connect(self.toggle_workframe_visibility)
@@ -964,3 +969,19 @@ class VideoEtude(QtWidgets.QMainWindow):
         launcher = pythonw if os.path.exists(pythonw) else sys.executable
 
         subprocess.Popen([launcher, script_path, base], cwd=script_dir, close_fds=True)
+
+    def current_smb_folder(self):
+        folder = self.file_table.current_folder_path()
+        if folder:
+            return folder
+        video_path = self.file_table.current_file_path()
+        return os.path.dirname(video_path) if video_path else ""
+
+    def open_smb_dialog(self):
+        folder = self.current_smb_folder()
+        if not folder:
+            QtWidgets.QMessageBox.information(self, "Check SMB", "No hay carpeta activa.")
+            return
+
+        dialog = SMBDialog(folder, self)
+        dialog.exec()

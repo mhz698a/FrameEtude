@@ -225,6 +225,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
         item = self.item(row, 0)
         return self._safe_text(item.data(QtCore.Qt.ItemDataRole.UserRole) if item else "")
 
+    def current_folder_path(self) -> str:
+        return self._safe_text(getattr(self, "_current_folder", ""))
+
     def copy_to_clipboard(self, text: str):
         QtWidgets.QApplication.clipboard().setText(text)
 
