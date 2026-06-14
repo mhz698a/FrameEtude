@@ -50,6 +50,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         self.setColumnCount(len(self.COLUMNS))
         self.setHorizontalHeaderLabels([label for label, _ in self.COLUMNS])
+        self.setColumnHidden(len(self.COLUMNS) - 1, True)
         self.verticalHeader().setVisible(True)
         self.horizontalHeader().setVisible(True)
 

@@ -1,4 +1,4 @@
-import os, re, struct, datetime, cv2, win32clipboard, subprocess
+import os, re, struct, datetime, cv2, win32clipboard, subprocess, sys
 from PyQt6 import QtCore, QtGui, QtWidgets
 from ocr_lib import OCRWorker, SelectionOverlay
 from curtain_lib import CurtainOverlay
@@ -44,12 +44,18 @@ class VideoEtude(QtWidgets.QMainWindow):
         h_master = QtWidgets.QHBoxLayout()
         self.combo_master = QtWidgets.QComboBox()
         self.combo_master.currentIndexChanged.connect(self.on_master_changed)
+        
         self.btn_rescan = QtWidgets.QPushButton("rescan")
         self.btn_rescan.clicked.connect(self.rescan_current_master_folder)
+        self.btn_check = QtWidgets.QPushButton("check")
+        self.btn_check.clicked.connect(self.open_lyrics_manager)
+        self.btn_check.hide()
+        
         h_master.addWidget(self.combo_master, 1)
         h_master.addWidget(self.btn_rescan)
+        h_master.addWidget(self.btn_check)
         left_layout.addLayout(h_master)
-
+        
         left_layout.addWidget(QtWidgets.QLabel('Archivos (selección única)'))
         self.file_table = FileTableWidget()
         self.file_table.itemSelectionChanged.connect(self.on_file_selected)
@@ -233,6 +239,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         # populate left panel combos
         try:
             self.populate_years()
+            self.update_lyrics_check_button_visibility()
         except Exception:
             pass
 
@@ -240,7 +247,6 @@ class VideoEtude(QtWidgets.QMainWindow):
         QtWidgets.QMessageBox.information(
             self, f"Overwrite {times_num[0]} Review: {times_num[1]}", times_num[2]
         )
-
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -275,6 +281,7 @@ class VideoEtude(QtWidgets.QMainWindow):
 
     def on_year_changed(self, idx):
         self.combo_master.clear()
+        self.btn_check.hide()
         year = self.combo_year.currentText()
         if not year or year == '(no encontrado)':
             return
@@ -303,6 +310,7 @@ class VideoEtude(QtWidgets.QMainWindow):
 
     def on_master_changed(self, idx):
         path = self.combo_master.currentText()
+        self.update_lyrics_check_button_visibility()
         if not path or path == '(no encontrado)':
             self.file_table.load_folder("")
             self.btn_load_selected.setEnabled(False)
@@ -930,3 +938,29 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.right_widget.updateGeometry()
         self.main_layout.invalidate()
         self.centralWidget().updateGeometry()
+
+    def update_lyrics_check_button_visibility(self):
+        path = self.combo_master.currentText().strip()
+        base = path if os.path.isdir(path) else os.path.dirname(path)
+        show = bool(base and os.path.basename(base.rstrip("\\/")).lower().endswith("lyrics"))
+        self.btn_check.setVisible(show)
+
+    def open_lyrics_manager(self):
+        path = self.combo_master.currentText().strip()
+        if not path or path == '(no encontrado)':
+            return
+
+        base = path if os.path.isdir(path) else os.path.dirname(path)
+        if not os.path.basename(base.rstrip("\\/")).lower().endswith("lyrics"):
+            return
+
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lirycs_mgr.pyw")
+        if not os.path.exists(script_path):
+            QtWidgets.QMessageBox.critical(self, "Error", f"No se encontró: {script_path}")
+            return
+
+        script_dir = os.path.dirname(script_path)
+        pythonw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+        launcher = pythonw if os.path.exists(pythonw) else sys.executable
+
+        subprocess.Popen([launcher, script_path, base], cwd=script_dir, close_fds=True)

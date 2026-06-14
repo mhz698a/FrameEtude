@@ -27,7 +27,7 @@ class LirycsBook(QMainWindow):
             self.setWindowIcon(QIcon(ICON_PATH_LIRYCS))
 
         self.setWindowTitle("LyricsBook")
-        self.resize(1000, 600)
+        self.resize(1200, 600)
         self.txt_files = []
         self.current_index = 0
         self.current_file = None
@@ -217,7 +217,7 @@ class LirycsBook(QMainWindow):
             self.text.clear()
             self.text.blockSignals(False)
             self.update_status()
-            self.setWindowTitle("TXT-Book Editor")
+            self.setWindowTitle("LyricsBook")
 
     # === Operaciones con archivos ===
     def open_file(self, filepath):
@@ -251,7 +251,7 @@ class LirycsBook(QMainWindow):
             self.current_index = 0
 
         self.update_status()
-        self.setWindowTitle(f"TXT-Book Editor - {os.path.basename(filepath)}")
+        self.setWindowTitle(f"LyricsBook - {os.path.basename(filepath)}")
 
     def save_file(self):
         if not self.current_file:
@@ -385,16 +385,6 @@ class LirycsBook(QMainWindow):
                 pal = QApplication().style().standardPalette()
 
         app.setPalette(pal)
-
-        # Opcional: cambiar color del header en Windows si pywinstyles está disponible
-        # if pywinstyles:
-        #     try:
-        #         if mode == 'dark':
-        #             pywinstyles.change_header_color(self, color="#232629")
-        #         else:
-        #             pywinstyles.change_header_color(self, color="#f0f0f0")
-        #     except Exception:
-        #         pass
 
     def paste_text(self):
         QApplication.clipboard()
