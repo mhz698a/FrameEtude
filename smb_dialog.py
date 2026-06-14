@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import html
-import os
 import ctypes
 import json
-import tempfile
+import os
 import sys
+import tempfile
 from pathlib import Path
+import html
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
@@ -164,7 +164,13 @@ class SMBDialog(QtWidgets.QDialog):
         self._worker: SMBWorker | None = None
 
         self._build_ui()
-        self._append_info(f"Carpeta actual: {self.folder_path or '(vacía)'}")
+        self._auto_check_done = False
+        
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._auto_check_done:
+            self._auto_check_done = True
+            QtCore.QTimer.singleShot(0, lambda: self._start_action("check"))
 
     def _build_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
@@ -182,19 +188,28 @@ class SMBDialog(QtWidgets.QDialog):
             "QTextEdit { background: #111; color: #fff; font-family: Consolas, monospace; }"
         )
         layout.addWidget(self.log_view, 1)
+        
+        self.systyle = QtWidgets.QApplication.style()
+        self.uac_pixel = self.systyle.standardPixmap(QtWidgets.QStyle.StandardPixmap.SP_VistaShield)
+        self.search_pixel = self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView)
+        self.icon_uac = QtGui.QIcon(self.uac_pixel)
+        self.icon_search = QtGui.QIcon(self.search_pixel)
 
         row1 = QtWidgets.QHBoxLayout()
-        self.btn_connect = QtWidgets.QPushButton("conectar")
-        self.btn_check = QtWidgets.QPushButton("comprobar estado")
-        self.btn_disconnect = QtWidgets.QPushButton("desconectar")
+        self.btn_connect = QtWidgets.QPushButton(" Conectar")
+        self.btn_check = QtWidgets.QPushButton(" Comprobar estado")
+        self.btn_disconnect = QtWidgets.QPushButton(" Desconectar")
+        self.btn_connect.setIcon(self.icon_uac)
+        self.btn_check.setIcon(self.icon_search)
+        self.btn_disconnect.setIcon(self.icon_uac)
         row1.addWidget(self.btn_connect)
         row1.addWidget(self.btn_check)
         row1.addWidget(self.btn_disconnect)
         layout.addLayout(row1)
 
         row2 = QtWidgets.QHBoxLayout()
-        self.btn_clear = QtWidgets.QPushButton("limpiar logs")
-        self.btn_close = QtWidgets.QPushButton("cerrar")
+        self.btn_clear = QtWidgets.QPushButton("Limpiar logs")
+        self.btn_close = QtWidgets.QPushButton("Cerrar")
         row2.addWidget(self.btn_clear)
         row2.addStretch(1)
         row2.addWidget(self.btn_close)
@@ -277,20 +292,27 @@ class SMBDialog(QtWidgets.QDialog):
 
         out_file = Path(tempfile.gettempdir()) / f"smb_check_{os.getpid()}_{action}.json"
         helper = Path(__file__).with_name("smb_uac_action.py")
+        
+        python_exe = sys.executable
+        if os.name == "nt":
+            candidate = Path(sys.executable).with_name("pythonw.exe")
+            if candidate.exists():
+                python_exe = str(candidate)
 
         if not helper.exists():
             self._append_error(f"No se encontró el helper: {helper.name}")
             self._set_busy(False)
             return
 
+        SW_HIDE = 0
         params = f'"{helper}" --action {action} --folder "{self.folder_path}" --out "{out_file}"'
         result = ctypes.windll.shell32.ShellExecuteW(
             None,
             "runas",
-            sys.executable,
+            python_exe,
             params,
             None,
-            1,
+            SW_HIDE,
         )
 
         if result <= 32:
@@ -317,9 +339,13 @@ class SMBDialog(QtWidgets.QDialog):
                 self._set_busy(False)
                 return
 
+            share_name = payload.get("share_name")
             for message in payload.get("messages", []):
                 level = payload.get("level", "info")
                 self._append(level, str(message))
+
+            if share_name:
+                self._append_info(f"Nombre del share: {share_name}")
 
             try:
                 out_file.unlink(missing_ok=True)

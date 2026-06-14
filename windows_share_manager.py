@@ -172,12 +172,18 @@ class WindowsShareManager:
         if payload is not None:
             env[self.PAYLOAD_ENV] = json.dumps(payload, ensure_ascii=False)
 
+        extra_args = {}
+        if os.name == "nt":
+            # CREATE_NO_WINDOW (0x08000000) evita que el subproceso herede o cree una consola visible
+            extra_args["creationflags"] = 0x08000000
+        
         proc = subprocess.run(
             [self._ps_exe, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
             capture_output=True,
             text=True,
             shell=False,
             env=env,
+            **extra_args # Inyecta de forma segura el flag de ocultación si estás en Windows
         )
 
         stdout = (proc.stdout or "").strip()
@@ -413,7 +419,10 @@ if ($payload.force) {
 } else {
     Remove-SmbShare -Name $payload.share_name -Confirm:$false -ErrorAction Stop | Out-Null
 }
-"OK"
+[pscustomobject]@{
+    ok = $true
+    share_name = $payload.share_name
+} | ConvertTo-Json -Compress
 """
             try:
                 self._run_powershell_json(script, {"share_name": nombre, "force": force})

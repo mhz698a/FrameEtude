@@ -49,7 +49,8 @@ def main():
                 payload = {
                     "ok": True,
                     "level": "ok",
-                    "messages": ["La carpeta ya estaba compartida."],
+                    "messages": [f"Recurso compartido creado: {share_name}"],
+                    "share_name": share_name,
                     "share": share,
                 }
             else:
@@ -75,7 +76,8 @@ def main():
             payload = {
                 "ok": True,
                 "level": "ok",
-                "messages": ["Recurso compartido eliminado correctamente."],
+                "messages": [f"Recurso compartido eliminado: {share_name}"],
+                "share_name": share_name,
             }
 
         out_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
