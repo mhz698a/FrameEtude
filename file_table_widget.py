@@ -2,7 +2,7 @@ import json, os, datetime, subprocess
 from typing import Any
 from PyQt6 import QtCore, QtGui, QtWidgets
 from config import RENAME_DIALOG_EXE, RENAME_DIALOG_SCRIPT
-
+from duration_async_lib import DurationFetchJob, DurationFetchThread
 from metadata_async_lib import MetadataSaveJob, MetadataSaveThread
 from metadata_edit_lib import (
     COMMENT_KEYS,
@@ -19,6 +19,7 @@ except Exception:
 
 class FileTableWidget(QtWidgets.QTableWidget):
     COLUMNS = [
+        ("Duration 🔒", "duration"),
         ("Filename", "filename"),
         ("Title", "title"),
         ("Album (Season/Sp)", "album"),
@@ -35,10 +36,13 @@ class FileTableWidget(QtWidgets.QTableWidget):
         ("Sobrescritura 3", "overwrite_3_times"),
         ("Free listener", "free_listener_times"),
     ]
+    row_count_changed = QtCore.pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._folder_cache: dict[str, list[dict[str, Any]]] = {}
+        self._duration_cache: dict[str, str] = {}
+        self._duration_threads: list[DurationFetchThread] = []
         self._current_folder = ""
         self._settings = QtCore.QSettings("FrameEtude", "FileTableWidget")
         self._metadata_thread = None
@@ -128,6 +132,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
     def _read_file_row(self, path: str) -> dict[str, Any]:
         row = self._empty_row()
+        row["duration"] = self._duration_cache.get(path, "")
         row["filename"] = os.path.basename(path)
         row["full_path"] = path
 
@@ -169,9 +174,10 @@ class FileTableWidget(QtWidgets.QTableWidget):
         self.setRowCount(0)
 
         if not self._current_folder:
+            self.row_count_changed.emit(0)
             self._sync_scrollbars()
             return
-
+        
         if self._current_folder in self._folder_cache:
             rows = self._folder_cache[self._current_folder]
         else:
@@ -197,12 +203,14 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
                 item.setData(
                     QtCore.Qt.ItemDataRole.UserRole,
-                    row.get("full_path", "") if c == 0 else row.get(key, "")
+                    row.get("full_path", "") if key == "filename" else row.get(key, "")
                 )
                 self.setItem(r, c, item)
 
         self._save_header_state()
         self._sync_scrollbars()
+        self.row_count_changed.emit(len(rows))
+        self._start_duration_fetch(rows)
 
     def _sync_scrollbars(self):
         self.setVerticalScrollBarPolicy(
@@ -222,7 +230,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         row = self.currentRow()
         if row < 0:
             return ""
-        item = self.item(row, 0)
+        item = self.item(row, self._filename_column())
         return self._safe_text(item.data(QtCore.Qt.ItemDataRole.UserRole) if item else "")
 
     def current_folder_path(self) -> str:
@@ -266,7 +274,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         self.copy_to_clipboard(self._tab_join_rows(rows))
 
     def _path_for_row(self, row: int) -> str:
-        item = self.item(row, 0)
+        item = self.item(row, self._filename_column())
         return self._safe_text(item.data(QtCore.Qt.ItemDataRole.UserRole) if item else "")
 
     def _parse_clipboard_matrix(self) -> list[list[str]]:
@@ -385,11 +393,16 @@ class FileTableWidget(QtWidgets.QTableWidget):
             item = self.item(row, column)
             if item is None:
                 item = QtWidgets.QTableWidgetItem()
+                item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
                 self.setItem(row, column, item)
 
-            item.setText(str(row_data.get(key, "")))
+            value = str(row_data.get(key, ""))
+            if key == "duration" and not value and item.text():
+                value = item.text()
 
-            if column == 0:
+            item.setText(value)
+
+            if key == "filename":
                 item.setData(
                     QtCore.Qt.ItemDataRole.UserRole,
                     row_data.get("full_path", ""),
@@ -404,6 +417,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
         for column, value in updates_by_column.items():
             if 0 <= column < self.columnCount():
                 key = self.COLUMNS[column][1]
+                if key == "duration":
+                    continue
                 updates_by_key[key] = value
 
         if not updates_by_key:
@@ -523,6 +538,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
                 if target_col >= self.columnCount():
                     break
+                if target_col == 0:
+                    continue
 
                 key = self.COLUMNS[target_col][1]
                 updates_by_key[key] = value
@@ -630,6 +647,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         if cell:
             index = self.indexAt(pos)
             if index.isValid():
+                
                 logical_col = index.column()
                 header_text = (
                     self.horizontalHeaderItem(logical_col).text()
@@ -639,9 +657,14 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
                 self.setCurrentCell(index.row(), index.column())
                 
-                menu.addAction("Editar esta celda", self.edit_current_cell)
-                menu.addAction("Pegar datos desde esta celda", self.paste_from_current_cell)
-                menu.addSeparator()
+                if logical_col != 0:
+                    menu.addAction("Editar esta celda", self.edit_current_cell)
+                    menu.addAction("Pegar datos desde esta celda", self.paste_from_current_cell)
+                    menu.addAction(
+                        "Pegar y Rellenar esta columna",
+                        lambda col=logical_col: self.fill_column_from_clipboard(col),
+                    )
+                    menu.addSeparator()
 
                 menu.addAction("Copiar celda", self.copy_current_cell)
                 menu.addAction("Copiar fila", self.copy_current_row)
@@ -652,7 +675,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
                     lambda _=False, t=header_text: self.copy_to_clipboard(t)
                 )
                 
-                if logical_col in (8, 9):
+                # if logical_col in (8, 9):
+                if self.COLUMNS[logical_col][1] in {"real_ctime", "real_mtime"}:
                     menu.addSeparator()
                     menu.addAction(
                         "Obtener y pegar ctime",
@@ -724,3 +748,96 @@ class FileTableWidget(QtWidgets.QTableWidget):
         main_window = self.window()
         if hasattr(main_window, "load_selected_file"):
             main_window.load_selected_file()
+
+    def _filename_column(self) -> int:
+        for index, (_, key) in enumerate(self.COLUMNS):
+            if key == "filename":
+                return index
+        return 0
+
+    def _start_duration_fetch(self, rows: list[dict[str, Any]]) -> None:
+        jobs = []
+        for row in rows:
+            path = self._safe_text(row.get("full_path", ""))
+            if path and path not in self._duration_cache:
+                jobs.append(DurationFetchJob(path=path))
+
+        if not jobs:
+            return
+
+        thread = DurationFetchThread(jobs, self)
+        thread.duration_ready.connect(self._on_duration_ready)
+        thread.finished.connect(thread.deleteLater)
+
+        self._duration_threads.append(thread)
+        thread.finished.connect(
+            lambda t=thread: self._duration_threads.remove(t)
+            if t in self._duration_threads
+            else None
+        )
+        thread.start()
+
+    def _on_duration_ready(self, path: str, duration_text: str) -> None:
+        self._duration_cache[path] = duration_text
+        self._update_duration_for_path(path, duration_text)
+
+    def _update_duration_for_path(self, path: str, duration_text: str) -> None:
+        filename_col = self._filename_column()
+
+        for row in range(self.rowCount()):
+            item = self.item(row, filename_col)
+            if not item:
+                continue
+            if self._safe_text(item.data(QtCore.Qt.ItemDataRole.UserRole)) != path:
+                continue
+
+            duration_item = self.item(row, 0)
+            if duration_item is None:
+                duration_item = QtWidgets.QTableWidgetItem()
+                duration_item.setFlags(
+                    duration_item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable
+                )
+                self.setItem(row, 0, duration_item)
+
+            duration_item.setText(duration_text)
+            return
+
+    def fill_column_from_clipboard(self, column: int):
+        if column <= 0 or column >= self.columnCount():
+            return
+
+        key = self.COLUMNS[column][1]
+        if key == "duration":
+            return
+
+        value = QtWidgets.QApplication.clipboard().text()
+        if not value.strip():
+            return
+
+        jobs = []
+
+        for row in range(self.rowCount()):
+            path = self._path_for_row(row)
+            if not path or not os.path.exists(path):
+                continue
+
+            replace_foreign = False
+            if key in COMMENT_KEYS:
+                status, existing_text = comment_status_from_path(path)
+                if status == "foreign":
+                    dlg = ForeignCommentDialog(self, existing_text)
+                    if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                        return
+                    replace_foreign = True
+
+            jobs.append(
+                MetadataSaveJob(
+                    row=row,
+                    path=path,
+                    updates={key: value},
+                    replace_foreign_comments=replace_foreign,
+                )
+            )
+
+        if jobs:
+            self._run_metadata_jobs(jobs)

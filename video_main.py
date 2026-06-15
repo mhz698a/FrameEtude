@@ -57,9 +57,13 @@ class VideoEtude(QtWidgets.QMainWindow):
         h_master.addWidget(self.btn_check)
         left_layout.addLayout(h_master)
         
-        left_layout.addWidget(QtWidgets.QLabel('Archivos (selección única)'))
+        self.folder_count_label = QtWidgets.QLabel("0 archivos detectados en esta carpeta")
+        left_layout.addWidget(self.folder_count_label)
+        
+        # left_layout.addWidget(QtWidgets.QLabel('Archivos (selección única)'))
         self.file_table = FileTableWidget()
         self.file_table.itemSelectionChanged.connect(self.on_file_selected)
+        self.file_table.row_count_changed.connect(self.on_file_count_changed)
         left_layout.addWidget(self.file_table, 1)
         
         self.metadata_progress_label = QtWidgets.QLabel("0/0")
@@ -388,14 +392,17 @@ class VideoEtude(QtWidgets.QMainWindow):
 
             for column, (_, key) in enumerate(self.file_table.COLUMNS):
                 item = self.file_table.item(row, column)
-
                 if item is None:
                     item = QtWidgets.QTableWidgetItem()
                     self.file_table.setItem(row, column, item)
 
-                item.setText(str(row_data.get(key, "")))
+                value = str(row_data.get(key, ""))
+                if key == "duration" and not value and item.text():
+                    value = item.text()
 
-                if column == 0:
+                item.setText(value)
+
+                if key == "filename":
                     item.setData(
                         QtCore.Qt.ItemDataRole.UserRole,
                         row_data.get("full_path", "")
@@ -985,3 +992,6 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         dialog = SMBDialog(folder, self)
         dialog.exec()
+
+    def on_file_count_changed(self, count):
+        self.folder_count_label.setText(f"{count} archivos detectados en esta carpeta")
