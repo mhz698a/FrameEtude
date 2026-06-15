@@ -198,7 +198,7 @@ class LyricVisionPanel(QtWidgets.QWidget):
 
     def save_current_file(self):
         if not self.indirect_path or self.stack.currentWidget() is self.warning_page:
-            return
+            return False
 
         folder = os.path.dirname(self.indirect_path)
         if folder:
@@ -208,6 +208,7 @@ class LyricVisionPanel(QtWidgets.QWidget):
             f.write(self.editor.toPlainText())
 
         self.editor.document().setModified(False)
+        return True
 
     def preview_current_file(self):
         dlg = QtWidgets.QDialog(self)
@@ -229,9 +230,13 @@ class LyricVisionPanel(QtWidgets.QWidget):
         dlg.exec()
 
     def next_file(self):
+        if not self._ask_pending_changes("Antes de pasar al siguiente archivo se debe resolver el estado del archivo actual."):
+            return
         self.main.next_lyric_entry()
         
     def prev_file(self):
+        if not self._ask_pending_changes("Antes de pasar al anterior archivo se debe resolver el estado del archivo actual."):
+            return
         self.main.prev_lyric_entry()
 
     @staticmethod
@@ -259,3 +264,51 @@ class LyricVisionPanel(QtWidgets.QWidget):
     def read_utf8(path: str) -> str:
         with open(path, "r", encoding="utf-8") as f:
             return f.read()
+
+    def _reload_current_document(self):
+        if not self.indirect_path or self.stack.currentWidget() is self.warning_page:
+            return
+
+        if not os.path.exists(self.indirect_path):
+            self.set_missing_document(
+                self.source_video_path,
+                self.indirect_path,
+                self.row_index,
+                self.total_rows,
+            )
+            return
+
+        text = self.read_utf8(self.indirect_path)
+        self.editor.blockSignals(True)
+        self.editor.setPlainText(text)
+        self.editor.blockSignals(False)
+        self.editor.document().setModified(False)
+        self.editor.moveCursor(QtGui.QTextCursor.MoveOperation.Start)
+        self._update_cursor_info()
+        
+    def _ask_pending_changes(self, action_text: str) -> bool:
+        if self.stack.currentWidget() is self.warning_page:
+            return True
+
+        if not self.editor.document().isModified():
+            return True
+
+        box = QtWidgets.QMessageBox(self)
+        box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        box.setWindowTitle("Cambios pendientes")
+        box.setText("Hay cambios sin guardar en el archivo actual.")
+        box.setInformativeText(action_text)
+
+        btn_save = box.addButton("Guardar", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+        btn_discard = box.addButton("Descartar", QtWidgets.QMessageBox.ButtonRole.DestructiveRole)
+        btn_cancel = box.addButton("Cancelar", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(btn_cancel)
+        box.exec()
+
+        clicked = box.clickedButton()
+        if clicked == btn_save:
+            return self.save_current_file()
+        if clicked == btn_discard:
+            self._reload_current_document()
+            return True
+        return False
