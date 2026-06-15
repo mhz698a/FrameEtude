@@ -9,6 +9,8 @@ from smb_dialog import SMBDialog
 from PIL import Image
 from config import *
 from utils import *
+from frame_player_panel import FramePlayerPanel
+from lyric_vision_panel import LyricVisionPanel
 
 # -----------------------
 # UI: VideoEtude main window
@@ -47,20 +49,31 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.combo_master = QtWidgets.QComboBox()
         self.combo_master.currentIndexChanged.connect(self.on_master_changed)
         
-        self.btn_rescan = QtWidgets.QPushButton("rescan")
+        self.btn_rescan = QtWidgets.QPushButton("Refresh")
         self.btn_rescan.clicked.connect(self.rescan_current_master_folder)
-        self.btn_check = QtWidgets.QPushButton("check")
+        
+        self.btn_open_folder = QtWidgets.QPushButton("Open")
+        self.btn_open_folder.clicked.connect(self.open_folder_in_explorer)
+        
+        self.btn_check = QtWidgets.QPushButton("Check")
         self.btn_check.clicked.connect(self.open_lyrics_manager)
         self.btn_check.hide()
         
         h_master.addWidget(self.combo_year)
         h_master.addWidget(self.combo_master, 1)
         h_master.addWidget(self.btn_rescan)
+        h_master.addWidget(self.btn_open_folder)
         h_master.addWidget(self.btn_check)
         left_layout.addLayout(h_master)
         
-        self.folder_count_label = QtWidgets.QLabel("0 archivos detectados en esta carpeta")
+        self.folder_count_label = QtWidgets.QLabel("0 archivos multimedia detectados en esta carpeta")
         left_layout.addWidget(self.folder_count_label)
+        
+        self.chk_lyric = QtWidgets.QCheckBox("Es lirica")
+        self.chk_lyric.setChecked(False)
+        self.chk_lyric.hide()
+        self.chk_lyric.toggled.connect(self.on_lyric_checkbox_toggled)
+        left_layout.addWidget(self.chk_lyric)
         
         self.file_table = FileTableWidget()
         self.file_table.itemSelectionChanged.connect(self.on_file_selected)
@@ -118,106 +131,19 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         # ---------------- Right main area ----------------
         self.right_widget = QtWidgets.QWidget()
-        self.right_layout = QtWidgets.QVBoxLayout(self.right_widget)
-        self.right_layout.setContentsMargins(0,0,0,0)
-        self.right_layout.setSpacing(8)
+        self.right_stack = QtWidgets.QStackedLayout(self.right_widget)
 
-        # Info (label)
-        self.info_label = QtWidgets.QLabel("Nombre - Duración")
-        self.right_layout.addWidget(self.info_label)
+        self.frame_player_panel = FramePlayerPanel(self)
+        self.lyric_panel = LyricVisionPanel(self)
 
-        # thumbnail container
-        self.thumb_container = QtWidgets.QWidget()
-        self.thumb_layout = QtWidgets.QHBoxLayout(self.thumb_container)
-        self.thumb_layout.setContentsMargins(0,0,0,0)
-        self.thumb_layout.setSpacing(THUMB_SPACING)
-        self.thumb_container.setSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Expanding, 
-            QtWidgets.QSizePolicy.Policy.Fixed
-        )
-        self.right_layout.addWidget(self.thumb_container)
-
-        # labels
-        self.thumb_labels = []
-        for _ in range(NUM_THUMBS):
-            lbl = QtWidgets.QLabel()
-            lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            lbl.setStyleSheet("background-color: rgb(18,18,18); border: 1px solid #2b2b2b;")
-            lbl.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
-            self.thumb_labels.append(lbl)
-
-        # curtain overlay
-        self.curtain = CurtainOverlay(self.thumb_container)
-        self.curtain.hide()
-
-        # Selection overlay (for OCR selection)
-        self.selection_overlay = SelectionOverlay(self.thumb_container)
-        self.selection_overlay.setGeometry(0, 0, 800, 200)  # will be updated in resize
-        self.selection_overlay.selection_made.connect(self._on_selection_made)
-
-        # controls: navigation (first row)
-        controls_nav = QtWidgets.QHBoxLayout()
-        btn_fc = QtWidgets.QPushButton("Fc"); btn_fc.clicked.connect(self.copy_frame_dib); controls_nav.addWidget(btn_fc)
-        for txt, func in [("-90", lambda: self.move_seconds(-90)), 
-                          ("-60", lambda: self.move_seconds(-60)), 
-                          ("-30", lambda: self.move_seconds(-30)),
-                          ("-01", lambda: self.move_seconds(-1)), 
-                          ("-Fr1", lambda: self.move_frame(-1))]:
-            b = QtWidgets.QPushButton(txt); b.clicked.connect(func); controls_nav.addWidget(b)
-        
-        self.entry_time = QtWidgets.QLineEdit(); self.entry_time.setFixedWidth(140); self.entry_time.returnPressed.connect(self.go_to_time)
-        controls_nav.addWidget(self.entry_time)
-        for txt, func in [("+Fr1", lambda: self.move_frame(1)), 
-                          ("+01", lambda: self.move_seconds(1)),
-                          ("+30", lambda: self.move_seconds(30)), 
-                          ("+60", lambda: self.move_seconds(60)),
-                          ("+90", lambda: self.move_seconds(90))]:
-            b = QtWidgets.QPushButton(txt); b.clicked.connect(func); controls_nav.addWidget(b)
-
-        self.right_layout.addLayout(controls_nav)
-
-        # controls: actions (second row) -> here go Tm, Ex, CCR and checkboxes
-        controls_actions = QtWidgets.QHBoxLayout()
-        btn_copy_time = QtWidgets.QPushButton("Copy Timestamp"); btn_copy_time.clicked.connect(self.copy_time_to_clipboard); controls_actions.addWidget(btn_copy_time)
-        btn_export = QtWidgets.QPushButton("Extract Frame"); btn_export.clicked.connect(self.export_frame_png); controls_actions.addWidget(btn_export)
-
-        # OCR CCR button
-        btn_ccr = QtWidgets.QPushButton("CCR")
-        btn_ccr.clicked.connect(self.activate_ocr_selection)
-        controls_actions.addWidget(btn_ccr)
-
-        # New Cut button
-        btn_cut_main = QtWidgets.QPushButton("Cut")
-        btn_cut_main.clicked.connect(self.show_cut_dialog)
-        controls_actions.addWidget(btn_cut_main)
-
-        # show adjacent + hide curtain
-        self.check_adjacent = QtWidgets.QCheckBox("Mostrar adyacentes")
-        self.check_adjacent.setChecked(False)
-        self.check_adjacent.hide()
-        self.check_adjacent.stateChanged.connect(self.update_thumbs_visibility)
-        controls_actions.addWidget(self.check_adjacent)
-        
-        self.check_curtain = QtWidgets.QCheckBox("Hide"); self.check_curtain.setChecked(False)
-        self.check_curtain.stateChanged.connect(self.update_curtain_visibility)
-        controls_actions.addWidget(self.check_curtain)
-        
-        self.check_always_on_top = QtWidgets.QCheckBox("Always on top")
-        self.check_always_on_top.setChecked(False)
-        self.check_always_on_top.stateChanged.connect(self.update_always_on_top)
-        controls_actions.addWidget(self.check_always_on_top)
-
-
-        # align remaining to left and add stretch
-        controls_actions.addStretch(1)
-        self.right_layout.addLayout(controls_actions)
-
-        self.status = QtWidgets.QLabel("")
-        self.right_layout.addWidget(self.status)
+        self.right_stack.addWidget(self.frame_player_panel)
+        self.right_stack.addWidget(self.lyric_panel)
+        self.right_stack.setCurrentWidget(self.frame_player_panel)
 
         self.main_layout.addWidget(self.right_widget, 1)
+        self.lyric_mode = False
 
-        # video state
+        # ----------------- video state ----------------------
         self.cap = None
         self.fps = 25.0
         self.frame_count = 0
@@ -290,6 +216,8 @@ class VideoEtude(QtWidgets.QMainWindow):
             pass
 
     def on_year_changed(self, idx):
+        self.exit_lyric_mode(uncheck=True)
+        self.chk_lyric.hide()
         self.combo_master.clear()
         self.btn_check.hide()
         year = self.combo_year.currentText()
@@ -319,11 +247,15 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.combo_master.addItem('(no encontrado)')
 
     def on_master_changed(self, idx):
+        self.exit_lyric_mode(uncheck=True)
+
         path = self.combo_master.currentText()
         self.update_lyrics_check_button_visibility()
+
         if not path or path == '(no encontrado)':
             self.file_table.load_folder("")
             self.btn_load_selected.setEnabled(False)
+            self._sync_lyric_checkbox_for_folder("")
             return
 
         base = path
@@ -332,6 +264,7 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         self.file_table.load_folder(base)
         self.btn_load_selected.setEnabled(False)
+        self._sync_lyric_checkbox_for_folder(base)
 
     def rescan_current_master_folder(self):
         path = self.combo_master.currentText()
@@ -345,12 +278,19 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.file_table.invalidate_folder(base)
         self.on_master_changed(self.combo_master.currentIndex())
 
+    def open_folder_in_explorer(self):
+        path = self.combo_master.currentText()
+        os.startfile(path)
+
     def on_file_selected(self):
         has_file = bool(self.file_table.current_file_path())
-
         self.btn_load_selected.setEnabled(has_file)
         
+        if self.lyric_mode and has_file:
+            self.load_current_lyric_entry()
+        
     def load_selected_file(self):
+        self.exit_lyric_mode(uncheck=True)
         video_path = self.file_table.current_file_path()
         if not video_path:
             return
@@ -414,6 +354,7 @@ class VideoEtude(QtWidgets.QMainWindow):
 
     # ---------------- UI <-> Worker lifecycle ----------------
     def open_video_dialog(self):
+        self.exit_lyric_mode(uncheck=True)
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "Open Video", "", "Video files (*.mp4 *.avi *.mov *.mkv *.wmv *.flv)"
             )
@@ -995,4 +936,123 @@ class VideoEtude(QtWidgets.QMainWindow):
         dialog.exec()
 
     def on_file_count_changed(self, count):
-        self.folder_count_label.setText(f"{count} archivos detectados en esta carpeta")
+        self.folder_count_label.setText(f"{count} archivos multimedia detectados en esta carpeta")
+
+    def _current_master_folder(self) -> str:
+        path = self.combo_master.currentText().strip()
+        if not path or path == '(no encontrado)':
+            return ""
+        return path if os.path.isdir(path) else os.path.dirname(path)
+
+    def _folder_is_vocal(self, folder: str) -> bool:
+        if not folder:
+            return False
+        return os.path.basename(folder.rstrip("\\/")).lower().endswith("vocals")
+
+    def _sync_lyric_checkbox_for_folder(self, folder: str):
+        show = self._folder_is_vocal(folder)
+
+        if not show:
+            self.exit_lyric_mode(uncheck=True)
+            self.chk_lyric.blockSignals(True)
+            self.chk_lyric.setChecked(False)
+            self.chk_lyric.blockSignals(False)
+            self.chk_lyric.hide()
+            return
+
+        self.chk_lyric.show()
+
+    def on_lyric_checkbox_toggled(self, checked: bool):
+        if checked:
+            if not self._folder_is_vocal(self._current_master_folder()):
+                self.chk_lyric.blockSignals(True)
+                self.chk_lyric.setChecked(False)
+                self.chk_lyric.blockSignals(False)
+                return
+            self.enter_lyric_mode()
+        else:
+            self.exit_lyric_mode(uncheck=False)
+
+    def enter_lyric_mode(self):
+        folder = self._current_master_folder()
+        if not self._folder_is_vocal(folder):
+            self.exit_lyric_mode(uncheck=True)
+            return
+
+        if self.file_table.rowCount() <= 0:
+            self.lyric_panel.clear()
+            self.ensure_workframe_visible()
+            self.right_stack.setCurrentWidget(self.lyric_panel)
+            return
+
+        if self.file_table.currentRow() < 0:
+            self.file_table.setCurrentCell(0, 0)
+
+        self.lyric_mode = True
+        self.ensure_workframe_visible()
+        self.right_stack.setCurrentWidget(self.lyric_panel)
+        self.load_current_lyric_entry()
+
+    def exit_lyric_mode(self, uncheck: bool = False):
+        self.lyric_mode = False
+
+        if hasattr(self, "right_stack"):
+            self.right_stack.setCurrentWidget(self.frame_player_panel)
+
+        if uncheck and hasattr(self, "chk_lyric"):
+            self.chk_lyric.blockSignals(True)
+            self.chk_lyric.setChecked(False)
+            self.chk_lyric.blockSignals(False)
+
+    def _selected_row_index_for_lyrics(self) -> int:
+        row = self.file_table.currentRow()
+        if row < 0 and self.file_table.rowCount() > 0:
+            row = 0
+            self.file_table.setCurrentCell(0, 0)
+        return row
+
+    def load_current_lyric_entry(self):
+        if not self.lyric_mode:
+            return
+
+        row = self._selected_row_index_for_lyrics()
+        if row < 0:
+            self.lyric_panel.clear()
+            return
+
+        video_path = self.file_table.current_file_path()
+        if not video_path:
+            return
+
+        indirect_path = self.lyric_panel.build_indirect_path(video_path)
+        total = self.file_table.rowCount()
+        name = os.path.basename(indirect_path)
+
+        if os.path.exists(indirect_path):
+            try:
+                text = self.lyric_panel.read_utf8(indirect_path)
+                self.lyric_panel.set_document(video_path, indirect_path, text, row + 1, total)
+            except Exception:
+                self.lyric_panel.set_missing_document(video_path, indirect_path, row + 1, total)
+        else:
+            self.lyric_panel.set_missing_document(video_path, indirect_path, row + 1, total)
+
+    def next_lyric_entry(self):
+        if self.file_table.rowCount() <= 0:
+            return
+
+        row = self._selected_row_index_for_lyrics()
+        next_row = 0 if row + 1 >= self.file_table.rowCount() else row + 1
+        self.file_table.setCurrentCell(next_row, 0)
+        self.load_current_lyric_entry()
+        
+    def prev_lyric_entry(self):
+        if self.file_table.rowCount() <= 0:
+            return
+
+        row = self._selected_row_index_for_lyrics()
+        # Si la fila actual es 0 o menor (ninguna selección), va a la última fila, si no, resta 1.
+        prev_row = self.file_table.rowCount() - 1 if row <= 0 else row - 1
+        
+        self.file_table.setCurrentCell(prev_row, 0)
+        self.load_current_lyric_entry()
