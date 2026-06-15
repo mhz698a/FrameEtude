@@ -36,13 +36,14 @@ class VideoEtude(QtWidgets.QMainWindow):
         left_layout = QtWidgets.QVBoxLayout(self.left_panel)
         left_layout.setContentsMargins(4,4,4,4)
         left_layout.setSpacing(6)
-
-        left_layout.addWidget(QtWidgets.QLabel('<b>Explorador E:\\_Internal</b>'))
-        self.combo_year = QtWidgets.QComboBox(); left_layout.addWidget(self.combo_year)
-        self.combo_year.currentIndexChanged.connect(self.on_year_changed)
-
-        left_layout.addWidget(QtWidgets.QLabel('Carpeta maestra (___[...])'))
+        
+        left_layout.addWidget(QtWidgets.QLabel('<b>Explorador E:\\_Internal\\___[...]</b>'))
         h_master = QtWidgets.QHBoxLayout()
+        
+        self.combo_year = QtWidgets.QComboBox()
+        self.combo_year.setFixedWidth(60)
+        self.combo_year.currentIndexChanged.connect(self.on_year_changed)
+        
         self.combo_master = QtWidgets.QComboBox()
         self.combo_master.currentIndexChanged.connect(self.on_master_changed)
         
@@ -52,6 +53,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_check.clicked.connect(self.open_lyrics_manager)
         self.btn_check.hide()
         
+        h_master.addWidget(self.combo_year)
         h_master.addWidget(self.combo_master, 1)
         h_master.addWidget(self.btn_rescan)
         h_master.addWidget(self.btn_check)
@@ -60,7 +62,6 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.folder_count_label = QtWidgets.QLabel("0 archivos detectados en esta carpeta")
         left_layout.addWidget(self.folder_count_label)
         
-        # left_layout.addWidget(QtWidgets.QLabel('Archivos (selección única)'))
         self.file_table = FileTableWidget()
         self.file_table.itemSelectionChanged.connect(self.on_file_selected)
         self.file_table.row_count_changed.connect(self.on_file_count_changed)
