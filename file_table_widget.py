@@ -1,4 +1,6 @@
 import json, os, datetime, subprocess
+import functools
+from ctypes import wintypes, windll
 from typing import Any
 from PyQt6 import QtCore, QtGui, QtWidgets
 from config import RENAME_DIALOG_EXE, RENAME_DIALOG_SCRIPT
@@ -7,6 +9,7 @@ from metadata_async_lib import MetadataSaveJob, MetadataSaveThread
 from metadata_edit_lib import (
     COMMENT_KEYS,
     ForeignCommentDialog,
+    ForeignCommentSummaryDialog,
     comment_display_value,
     comment_status_from_path,
 )
@@ -16,6 +19,12 @@ try:
 except Exception:
     MP4 = None
 
+def windows_sort_key():
+    _StrCmpLogicalW = windll.Shlwapi.StrCmpLogicalW
+    _StrCmpLogicalW.argtypes = [wintypes.LPWSTR, wintypes.LPWSTR]
+    _StrCmpLogicalW.restype = wintypes.INT
+
+    return functools.cmp_to_key(_StrCmpLogicalW)
 
 class FileTableWidget(QtWidgets.QTableWidget):
     COLUMNS = [
@@ -190,8 +199,16 @@ class FileTableWidget(QtWidgets.QTableWidget):
                         ".mp4", ".m4v", ".mov", ".mkv", ".avi", ".wmv", ".flv"
                     }
                 ]
-                for filename in sorted(files):
-                    rows.append(self._read_file_row(os.path.join(self._current_folder, filename)))
+                
+                files = sorted(files, key=windows_sort_key())
+
+                for filename in files:
+                    rows.append(
+                        self._read_file_row(
+                            os.path.join(self._current_folder, filename)
+                        )
+                    )
+                    
             except Exception:
                 rows = []
             self._folder_cache[self._current_folder] = rows
@@ -277,6 +294,163 @@ class FileTableWidget(QtWidgets.QTableWidget):
         item = self.item(row, self._filename_column())
         return self._safe_text(item.data(QtCore.Qt.ItemDataRole.UserRole) if item else "")
 
+    def _track_column_index(self) -> int:
+        for index, (_, key) in enumerate(self.COLUMNS):
+            if key == "track":
+                return index
+        return -1
+
+    def _track_number_from_text(self, text: str) -> int | None:
+        raw = self._safe_text(text)
+        if not raw:
+            return None
+        head = raw.split("/", 1)[0].strip()
+        if not head.isdigit():
+            return None
+        value = int(head)
+        return value if value > 0 else None
+
+    def _track_number_from_row(self, row: int) -> int | None:
+        track_col = self._track_column_index()
+        if track_col < 0:
+            return None
+        item = self.item(row, track_col)
+        return self._track_number_from_text(item.text() if item else "")
+
+    def _used_track_numbers(self, exclude_row: int | None = None) -> set[int]:
+        used: set[int] = set()
+        track_col = self._track_column_index()
+        if track_col < 0:
+            return used
+
+        for row in range(self.rowCount()):
+            if exclude_row is not None and row == exclude_row:
+                continue
+            number = self._track_number_from_row(row)
+            if number is not None:
+                used.add(number)
+
+        return used
+
+    def _set_track_number(self, row: int, number: int) -> None:
+        total = self.rowCount()
+        track_col = self._track_column_index()
+        if track_col < 0 or total <= 0:
+            return
+        self._save_row_updates(row, {track_col: f"{number:02d}/{total:02d}"})
+
+    def _revoke_track_number(self, row: int) -> None:
+        track_col = self._track_column_index()
+        if track_col < 0:
+            return
+        self._save_row_updates(row, {track_col: ""})
+
+    def _assign_remaining_track_numbers(self) -> None:
+        total = self.rowCount()
+        track_col = self._track_column_index()
+        if track_col < 0 or total <= 0:
+            return
+
+        used = self._used_track_numbers()
+        available = [n for n in range(1, total + 1) if n not in used]
+        jobs: list[MetadataSaveJob] = []
+
+        for row in range(total):
+            if not available:
+                break
+
+            path = self._path_for_row(row)
+            if not path or not os.path.exists(path):
+                continue
+
+            if self._track_number_from_row(row) is not None:
+                continue
+
+            number = available.pop(0)
+            jobs.append(
+                MetadataSaveJob(
+                    row=row,
+                    path=path,
+                    updates={"track": f"{number:02d}/{total:02d}"},
+                    replace_foreign_comments=False,
+                )
+            )
+
+        if jobs:
+            self._run_metadata_jobs(jobs)
+
+    def _foreign_comment_summary_text(self, entries: list[tuple[str, str]]) -> str:
+        blocks = []
+        for path, text in entries:
+            name = os.path.basename(path) if path else ""
+            blocks.append(f"Archivo: {name}\nRuta: {path}\n\n{text}")
+        return ("\n" + ("-" * 72) + "\n").join(blocks)
+
+    def _show_foreign_comment_summary(self, entries: list[tuple[str, str]]) -> bool:
+        if not entries:
+            return True
+        dlg = ForeignCommentSummaryDialog(self, self._foreign_comment_summary_text(entries))
+        return dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted
+
+    def _foreign_comment_resolution(
+        self,
+        path: str,
+        foreign_entries: list[tuple[str, str]],
+        collecting_all: bool,
+        *,
+        batch_mode: bool = False,
+    ) -> tuple[bool, bool, bool]:
+        status, existing_text = comment_status_from_path(path)
+        if status != "foreign":
+            return True, collecting_all, False
+
+        if batch_mode and collecting_all:
+            foreign_entries.append((path, existing_text))
+            return True, collecting_all, True
+
+        dlg = ForeignCommentDialog(self, existing_text)
+        if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return False, collecting_all, False
+
+        choice = getattr(dlg, "choice", "yes")
+        if choice == "no_all":
+            return False, collecting_all, False
+
+        if batch_mode and choice == "yes_all":
+            foreign_entries.append((path, existing_text))
+            return True, True, True
+
+        return True, collecting_all, True
+
+    def _add_track_context_menu(self, menu: QtWidgets.QMenu, row: int) -> None:
+        total = self.rowCount()
+        if total <= 0:
+            return
+
+        track_menu = menu.addMenu("Track (EpNum)")
+        set_menu = track_menu.addMenu("Establecer numero de pista")
+        used_numbers = self._used_track_numbers()
+
+        for start in range(1, total + 1, 10):
+            end = min(start + 9, total)
+            block_menu = set_menu.addMenu(f"{start:02d}-{end:02d}")
+
+            for number in range(start, end + 1):
+                action = block_menu.addAction(f"{number:02d}/{total:02d}")
+                if number in used_numbers:
+                    action.setEnabled(False)
+                    action.setToolTip("Este número ya está asignado a otra pista")
+                    continue
+                action.triggered.connect(
+                    lambda _checked=False, n=number, r=row: self._set_track_number(r, n)
+                )
+
+        track_menu.addAction("Asignar el resto", self._assign_remaining_track_numbers)
+        track_menu.addAction(
+            "Revocar numero de pista",
+            lambda _checked=False, r=row: self._revoke_track_number(r),
+        )
+
     def _parse_clipboard_matrix(self) -> list[list[str]]:
         text = QtWidgets.QApplication.clipboard().text()
         if not text:
@@ -341,7 +515,10 @@ class FileTableWidget(QtWidgets.QTableWidget):
             return
 
         ts_kind = "ctime" if target_key == "real_ctime" else "mtime"
+        
         jobs: list[MetadataSaveJob] = []
+        foreign_entries: list[tuple[str, str]] = []
+        collecting_all = False
 
         for row in range(self.rowCount()):
             path = self._path_for_row(row)
@@ -352,13 +529,14 @@ class FileTableWidget(QtWidgets.QTableWidget):
             if not value:
                 continue
 
-            replace_foreign = False
-            status, existing_text = comment_status_from_path(path)
-            if status == "foreign":
-                dlg = ForeignCommentDialog(self, existing_text)
-                if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
-                    return
-                replace_foreign = True
+            can_continue, collecting_all, replace_foreign = self._foreign_comment_resolution(
+                path,
+                foreign_entries,
+                collecting_all,
+                batch_mode=True,
+            )
+            if not can_continue:
+                return
 
             jobs.append(
                 MetadataSaveJob(
@@ -368,6 +546,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
                     replace_foreign_comments=replace_foreign,
                 )
             )
+
+        if not self._show_foreign_comment_summary(foreign_entries):
+            return
 
         self._run_metadata_jobs(jobs)
 
@@ -513,12 +694,15 @@ class FileTableWidget(QtWidgets.QTableWidget):
             return
         self._paste_from_start(row, column)
 
+
     def _paste_from_start(self, start_row: int, start_col: int):
         matrix = self._parse_clipboard_matrix()
         if not matrix:
             return
 
         jobs = []
+        foreign_entries: list[tuple[str, str]] = []
+        collecting_all = False
 
         for r_off, src_row in enumerate(matrix):
             target_row = start_row + r_off
@@ -558,15 +742,14 @@ class FileTableWidget(QtWidgets.QTableWidget):
             }
 
             if any(key in comment_columns for key in updates_by_key):
-                status, existing_text = comment_status_from_path(path)
-
-                if status == "foreign":
-                    dlg = ForeignCommentDialog(self, existing_text)
-
-                    if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
-                        return
-
-                    replace_foreign = True
+                can_continue, collecting_all, replace_foreign = self._foreign_comment_resolution(
+                    path,
+                    foreign_entries,
+                    collecting_all,
+                    batch_mode=True,
+                )
+                if not can_continue:
+                    return
 
             jobs.append(
                 MetadataSaveJob(
@@ -578,6 +761,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
             )
 
         if not jobs:
+            return
+        
+        if not self._show_foreign_comment_summary(foreign_entries):
             return
 
         thread = MetadataSaveThread(jobs, self)
@@ -642,7 +828,20 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         cell = index.isValid()
 
-        menu = QtWidgets.QMenu(self)
+        menu = QtWidgets.QMenu(self)                
+        menu.setStyleSheet("""
+            QMenu::item {
+                padding: 4px 20px;
+                color: #ffffff; /* Color de texto normal (ej. tema oscuro) */
+            }
+            QMenu::item:selected {
+                background-color: #007acc; /* Color al pasar el cursor */
+            }
+            QMenu::item:disabled {
+                color: #666666; /* Texto gris para indicar que está usado */
+                background-color: transparent; /* Evita que resalte */
+            }
+        """)
 
         if cell:
             index = self.indexAt(pos)
@@ -664,6 +863,14 @@ class FileTableWidget(QtWidgets.QTableWidget):
                         "Pegar y Rellenar esta columna",
                         lambda col=logical_col: self.fill_column_from_clipboard(col),
                     )
+                    menu.addAction(
+                        "Rellenar esta columna con un valor",
+                        lambda col=logical_col: self.fill_column_from_input(col),
+                    )
+                    menu.addAction(
+                        "Vaciar esta columna",
+                        lambda col=logical_col: self.fill_column_with_voids(col),
+                    )
                     menu.addSeparator()
 
                 menu.addAction("Copiar celda", self.copy_current_cell)
@@ -675,18 +882,25 @@ class FileTableWidget(QtWidgets.QTableWidget):
                     lambda _=False, t=header_text: self.copy_to_clipboard(t)
                 )
                 
-                # if logical_col in (8, 9):
-                if self.COLUMNS[logical_col][1] in {"real_ctime", "real_mtime"}:
+                if self.COLUMNS[logical_col][1] == "track":
                     menu.addSeparator()
-                    menu.addAction(
-                        "Obtener y pegar ctime",
-                        lambda: self._save_filesystem_times_from_column("real_ctime")
-                    )
+                    self._add_track_context_menu(menu, index.row())
+                                    
+                # if logical_col in (8, 9):
+                if self.COLUMNS[logical_col][1] == "real_mtime":
+                    menu.addSeparator()
                     menu.addAction(
                         "Obtener y pegar mtime",
                         lambda: self._save_filesystem_times_from_column("real_mtime")
                     )
                 
+                if self.COLUMNS[logical_col][1] == "real_ctime":
+                    menu.addSeparator()
+                    menu.addAction(
+                        "Obtener y pegar ctime",
+                        lambda: self._save_filesystem_times_from_column("real_ctime")
+                    )
+                    
                 menu.addAction(
                     "Copiar columna completa",
                     lambda col=logical_col: self.copy_column(col, include_header=True)
@@ -815,6 +1029,58 @@ class FileTableWidget(QtWidgets.QTableWidget):
             return
 
         jobs = []
+        foreign_entries: list[tuple[str, str]] = []
+        collecting_all = False
+
+        for row in range(self.rowCount()):
+            path = self._path_for_row(row)
+            if not path or not os.path.exists(path):
+                continue
+
+            replace_foreign = False
+            if key in COMMENT_KEYS:
+                can_continue, collecting_all, replace_foreign = self._foreign_comment_resolution(
+                    path,
+                    foreign_entries,
+                    collecting_all,
+                    batch_mode=True,
+                )
+                if not can_continue:
+                    return
+
+            jobs.append(
+                MetadataSaveJob(
+                    row=row,
+                    path=path,
+                    updates={key: value},
+                    replace_foreign_comments=replace_foreign,
+                )
+            )
+            
+        if not self._show_foreign_comment_summary(foreign_entries):
+            return
+
+        if jobs:
+            self._run_metadata_jobs(jobs)
+            
+    def fill_column_from_input(self, column: int):
+        if column <= 0 or column >= self.columnCount():
+            return
+
+        key = self.COLUMNS[column][1]
+        if key == "duration":
+            return
+
+        value, ok = QtWidgets.QInputDialog.getText(
+            self, 
+            "Introducir valor", 
+            f"Ingrese el nuevo valor para rellenar esta columna '{key}':"
+        )
+        
+        if not ok or not value.strip():
+            return
+
+        jobs = []
 
         for row in range(self.rowCount()):
             path = self._path_for_row(row)
@@ -841,3 +1107,52 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         if jobs:
             self._run_metadata_jobs(jobs)
+
+    def fill_column_with_voids(self, column: int):
+            if column <= 0 or column >= self.columnCount():
+                return
+
+            key = self.COLUMNS[column][1]
+            if key == "duration":
+                return
+            
+            reply = QtWidgets.QMessageBox.warning(
+                self,
+                "Advertencia de borrado",
+                f"Se vaciará toda la columna '{key}'. Asegúrate de respaldar la información antes de continuar.\n\n¿Deseas proceder?",
+                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                QtWidgets.QMessageBox.StandardButton.No
+            )
+            
+            if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+                return
+            
+            value = ''
+            
+            jobs = []
+
+            for row in range(self.rowCount()):
+                path = self._path_for_row(row)
+                if not path or not os.path.exists(path):
+                    continue
+
+                replace_foreign = False
+                if key in COMMENT_KEYS:
+                    status, existing_text = comment_status_from_path(path)
+                    if status == "foreign":
+                        dlg = ForeignCommentDialog(self, existing_text)
+                        if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                            return
+                        replace_foreign = True
+
+                jobs.append(
+                    MetadataSaveJob(
+                        row=row,
+                        path=path,
+                        updates={key: value},
+                        replace_foreign_comments=replace_foreign,
+                    )
+                )
+
+            if jobs:
+                self._run_metadata_jobs(jobs)

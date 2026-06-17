@@ -50,6 +50,7 @@ class ForeignCommentDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self.setWindowTitle("Comentarios existentes")
         self.setModal(True)
+        self.choice = "cancel"
 
         layout = QtWidgets.QVBoxLayout(self)
 
@@ -67,20 +68,65 @@ class ForeignCommentDialog(QtWidgets.QDialog):
         text_edit.setMinimumSize(620, 240)
         layout.addWidget(text_edit)
 
-        buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Yes
-            | QtWidgets.QDialogButtonBox.StandardButton.No
-        )
-        yes_button = buttons.button(QtWidgets.QDialogButtonBox.StandardButton.Yes)
-        no_button = buttons.button(QtWidgets.QDialogButtonBox.StandardButton.No)
-        if yes_button is not None:
-            yes_button.setText("Yes")
-        if no_button is not None:
-            no_button.setText("No")
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        buttons_row = QtWidgets.QHBoxLayout()
+        buttons_row.addStretch(1)
 
+        yes_button = QtWidgets.QPushButton("Yes")
+        yes_all_button = QtWidgets.QPushButton("Yes to all")
+        no_all_button = QtWidgets.QPushButton("No to All")
+
+        yes_button.clicked.connect(self._accept_yes)
+        yes_all_button.clicked.connect(self._accept_yes_to_all)
+        no_all_button.clicked.connect(self._reject_no_to_all)
+
+        buttons_row.addWidget(yes_button)
+        buttons_row.addWidget(yes_all_button)
+        buttons_row.addWidget(no_all_button)
+        layout.addLayout(buttons_row)
+
+    def _accept_yes(self):
+        self.choice = "yes"
+        self.accept()
+
+    def _accept_yes_to_all(self):
+        self.choice = "yes_all"
+        self.accept()
+
+    def _reject_no_to_all(self):
+        self.choice = "no_all"
+        self.reject()
+
+class ForeignCommentSummaryDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None, aggregated_text: str = ""):
+        super().__init__(parent)
+        self.setWindowTitle("Comentarios existentes recopilados")
+        self.setModal(True)
+
+        layout = QtWidgets.QVBoxLayout(self)
+
+        label = QtWidgets.QLabel(
+            "Si desea rescatar esta informacion puede copiarla y guardarla"
+        )
+        label.setWordWrap(True)
+        layout.addWidget(label)
+
+        text_edit = QtWidgets.QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setPlainText(aggregated_text)
+        text_edit.setMinimumSize(720, 320)
+        layout.addWidget(text_edit)
+
+        buttons_row = QtWidgets.QHBoxLayout()
+        buttons_row.addStretch(1)
+
+        proceed_button = QtWidgets.QPushButton("proceder")
+        cancel_button = QtWidgets.QPushButton("cancelar")
+        proceed_button.clicked.connect(self.accept)
+        cancel_button.clicked.connect(self.reject)
+
+        buttons_row.addWidget(proceed_button)
+        buttons_row.addWidget(cancel_button)
+        layout.addLayout(buttons_row)
 
 def _safe_text(value: Any) -> str:
     if value is None:
