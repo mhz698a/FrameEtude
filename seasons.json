@@ -1,0 +1,229 @@
+{
+    "seasons": [
+        {
+            "year": "2004",
+            "precure_season_name": "Futari wa Pretty Cure",
+            "precure_season_kanji_name": "ふたりはプリキュア",
+            "precure_season_romaji_name": "Futari wa Purikyua",
+            "ep_total": "49",
+            "release_date": "2004-02-01",
+            "theme_description": "Luz y oscuridad, La amistad diversa"
+        },
+        {
+            "year": "2005",
+            "precure_season_name": "Furari wa Pretty Cure Max Heart",
+            "precure_season_kanji_name": "ふたりはプリキュア ー マックスハート",
+            "precure_season_romaji_name": "Futari wa Purikyua Makkusu Hāto",
+            "ep_total": "47",
+            "release_date": "2005-02-06",
+            "theme_description": "Luz y oscuridad, La amistad diversa"
+        },
+        {
+            "year": "2006",
+            "precure_season_name": "Furari wa Pretty Cure Splash Star",
+            "precure_season_kanji_name": "ふたりはプリキュア Splash★Star",
+            "precure_season_romaji_name": "Futari wa Purikyua Supurasshu Sutā",
+            "ep_total": "49",
+            "release_date": "2006-02-05",
+            "theme_description": "Plantas y naturaleza, Cuida el medio ambiente"
+        },
+        {
+            "year": "2007",
+            "precure_season_name": "Yes! Pretty Cure 5",
+            "precure_season_kanji_name": "Yes！プリキュア 5",
+            "precure_season_romaji_name": "Iesu! Purikyua Faibu",
+            "ep_total": "49",
+            "release_date": "2007-02-04",
+            "theme_description": "Las mariposas y el significado de los sueños, Aprendizaje de la percepcion."
+        },
+        {
+            "year": "2008",
+            "precure_season_name": "Yes! Pretty Cure 5 GoGo",
+            "precure_season_kanji_name": "Yes！プリキュア 5 GoGo",
+            "precure_season_romaji_name": "Iesu! Purikyua Faibu GoGo",
+            "ep_total": "48",
+            "release_date": "2008-02-03",
+            "theme_description": "Las mariposas, el significado de los sueños Incluye las rosas, Aprendizaje de la ecencia"
+        },
+        {
+            "year": "2009",
+            "precure_season_name": "Fresh Pretty Cure",
+            "precure_season_kanji_name": "フレッシュプリキュア!",
+            "precure_season_romaji_name": "Furesshu PuriKyua!",
+            "ep_total": "50",
+            "release_date": "2009-02-01",
+            "theme_description": "Las frutas, los tréboles, los palos de las cartas, el baile y la felicidad. Supera las tradiciones"
+        },
+        {
+            "year": "2010",
+            "precure_season_name": "HeartCatch Pretty Cure",
+            "precure_season_kanji_name": "ハートキャッチプリキュア！",
+            "precure_season_romaji_name": "Hātokyacchi Purikyua!",
+            "ep_total": "49",
+            "release_date": "2010-02-07",
+            "theme_description": "Las flores y la moda, tratamiento de los sentimientos y el corazon"
+        },
+        {
+            "year": "2011",
+            "precure_season_name": "Suite Pretty Cure♪",
+            "precure_season_kanji_name": "スイート プリキュア",
+            "precure_season_romaji_name": "Suīto PuriKyua♪",
+            "ep_total": "48",
+            "release_date": "2011-02-06",
+            "theme_description": "Música, Importancia de la familia y combate la manipulacion"
+        },
+        {
+            "year": "2012",
+            "precure_season_name": "Smile Pretty Cure",
+            "precure_season_kanji_name": "スマイルプリキュア！",
+            "precure_season_romaji_name": "Sumairu Purikyua!",
+            "ep_total": "48",
+            "release_date": "2012-02-05",
+            "theme_description": "Los cuentos de hadas. Te anima a persistir y no rendirte"
+        },
+        {
+            "year": "2013",
+            "precure_season_name": "Doki Doki! Pretty Cure",
+            "precure_season_kanji_name": "ドキドキ！ プリキュア",
+            "precure_season_romaji_name": "Dokidoki! PuriKyua!",
+            "ep_total": "49",
+            "release_date": "2013-02-03",
+            "theme_description": "Cartas y comportamiento moral."
+        },
+        {
+            "year": "2014",
+            "precure_season_name": "HappinessCharge Pretty Cure",
+            "precure_season_kanji_name": "ハピネスチャージプリキュア！",
+            "precure_season_romaji_name": "Hapinesuchāji Purikyua!",
+            "ep_total": "49",
+            "release_date": "2014-02-02",
+            "theme_description": "Espejos, baile y moda. La importacia de la ayuda, el trabajo en equipo, el sentimiento del amor de verdad."
+        },
+        {
+            "year": "2015",
+            "precure_season_name": "Go! Princess Pretty Cure",
+            "precure_season_kanji_name": "Go! プリンセスプリキュア",
+            "precure_season_romaji_name": "Gõ! Purinsesu Purikyua",
+            "ep_total": "50",
+            "release_date": "2015-02-01",
+            "theme_description": "Princesas, la realeza y las llaves. La cortecia y la educacion."
+        },
+        {
+            "year": "2016",
+            "precure_season_name": "Mahou Tsukai Pretty Cure",
+            "precure_season_kanji_name": "魔法つかい プリキュア!",
+            "precure_season_romaji_name": "Mahō Tsukai Purikyua!",
+            "ep_total": "50",
+            "release_date": "2016-02-07",
+            "theme_description": "Gemas y magia. El ser individual a cambio de compartir y disfrutar con todos,  el milagro de la magia en la amistad."
+        },
+        {
+            "year": "2017",
+            "precure_season_name": "KiraKira☆Pretty Cure A La Mode",
+            "precure_season_kanji_name": "キラキラ☆プリキュアアラモード",
+            "precure_season_romaji_name": "KiraKira☆Purikyua A Ra Mōdo",
+            "ep_total": "49",
+            "release_date": "2017-02-05",
+            "theme_description": "Dulces y animales, Los sentimientos y emociones de cada uno."
+        },
+        {
+            "year": "2018",
+            "precure_season_name": "HUGtto! Pretty Cure",
+            "precure_season_kanji_name": "HuGっと！プリキュア",
+            "precure_season_romaji_name": "HUGtto! Purikyua",
+            "ep_total": "49",
+            "release_date": "2018-02-04",
+            "theme_description": "Las profesiones y el destino o futuro"
+        },
+        {
+            "year": "2019",
+            "precure_season_name": "Star☆Twinkle Pretty Cure",
+            "precure_season_kanji_name": "スター☆トゥインクル プリキュア",
+            "precure_season_romaji_name": "Sutā ☆ Tuinkuru Purikyua",
+            "ep_total": "49",
+            "release_date": "2019-02-03",
+            "theme_description": "Espacio, extraterrestres, viajes interplanetarios y la imaginación y creatividad"
+        },
+        {
+            "year": "2020",
+            "precure_season_name": "Healin' Good♡Pretty Cure",
+            "precure_season_kanji_name": "ヒーリングっど♡プリキュア",
+            "precure_season_romaji_name": "Hīringuddo♡Purikyua",
+            "ep_total": "45",
+            "release_date": "2020-02-02",
+            "theme_description": "La salud, los animales y la naturaleza"
+        },
+        {
+            "year": "2021",
+            "precure_season_name": "Tropical-Rouge! Pretty Cure",
+            "precure_season_kanji_name": "トロピカル〜ジュ！プリキュア",
+            "precure_season_romaji_name": "Toropika Rūju! Purikyua",
+            "ep_total": "46",
+            "release_date": "2021-02-28",
+            "theme_description": "Lo tropical, el maquillaje y la estética, y el verano"
+        },
+        {
+            "year": "2022",
+            "precure_season_name": "Delicious Party♡Pretty Cure",
+            "precure_season_kanji_name": "デリシャスパーティ♡プリキュア",
+            "precure_season_romaji_name": "Derishasupāti ♡ Purikyua",
+            "ep_total": "45",
+            "release_date": "2022-02-06",
+            "theme_description": "Comida, compartir y la alegría"
+        },
+        {
+            "year": "2023",
+            "precure_season_name": "Hirogaru Sky! Pretty Cure",
+            "precure_season_kanji_name": "ひろがるスカイ！プリキュア",
+            "precure_season_romaji_name": "Hirogaru sukai! Purikyua",
+            "ep_total": "50",
+            "release_date": "2023-02-05",
+            "theme_description": "Los héroes, mientras que el motivo son los cielos interminables"
+        },
+        {
+            "year": "2024",
+            "precure_season_name": "Wonderful Pretty Cure!",
+            "precure_season_kanji_name": "わんだふるぷりきゅあ！",
+            "precure_season_romaji_name": "Wandafuru Purikyua!",
+            "ep_total": "50",
+            "release_date": "2024-02-04",
+            "theme_description": "Los animales, mientras que el tema principal es todos los humanos y los animales pueden hacerse amigos."
+        },
+        {
+            "year": "2025",
+            "precure_season_name": "Kimi to Idol Pretty Cure♪",
+            "precure_season_kanji_name": "キミとアイドルプリキュア♪",
+            "precure_season_romaji_name": "Kimi to Aidoru Purikyua♪",
+            "ep_total": "49",
+            "release_date": "2025-02-02",
+            "theme_description": "El baile y las canciones entre la Idol y el fanático."
+        },
+        {
+            "year": "2023",
+            "precure_season_name": "Kibou no chikara otona precure 23",
+            "precure_season_kanji_name": "キボウノチカラ～オトナプリキュア‘23",
+            "precure_season_romaji_name": "Kibō no Chikara Otona Purikyua'23",
+            "ep_total": "12",
+            "release_date": "2023-10-07",
+            "theme_description": "Las mariposas, el significado de los sueños Incluye las rosas, Aprendizaje de la ecencia"
+        },
+        {
+            "year": "2024",
+            "precure_season_name": "Mahou Tsukai Pretty Cure II ~MIRAI DAYS~",
+            "precure_season_kanji_name": "魔法つかいプリキュア！！～MIRAI DAYS～",
+            "precure_season_romaji_name": "Mahōtsukai Purikyua!! ～Mirai Deizu～",
+            "ep_total": "12",
+            "release_date": "2025-01-12",
+            "theme_description": "Gemas y magia. El ser individual a cambio de compartir y disfrutar con todos,  el milagro de la magia en la amistad."
+        },
+        {
+            "year": "2026",
+            "precure_season_name": "Meitantei Pretty Cure!",
+            "precure_season_kanji_name": "名探偵プリキュア！",
+            "precure_season_romaji_name": "Meitantei Purikyua!",
+            "ep_total": "50",
+            "release_date": "2026-02-01",
+            "theme_description": "Los misterios, detectives y viajes en el tiempo"
+        }
+    ]
+}

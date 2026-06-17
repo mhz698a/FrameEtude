@@ -40,12 +40,13 @@ class VideoEtude(QtWidgets.QMainWindow):
         left_layout.setSpacing(6)
         
         left_layout.addWidget(QtWidgets.QLabel('<b>E:\\_Internal\\___[...]\\...\\...</b>'))
-        h_master = QtWidgets.QHBoxLayout()
+        h1_master = QtWidgets.QHBoxLayout()
         
         self.combo_year = QtWidgets.QComboBox()
         self.combo_year.setFixedWidth(60)
         self.combo_year.currentIndexChanged.connect(self.on_year_changed)
         
+        h2_master = QtWidgets.QHBoxLayout()
         self.combo_master = QtWidgets.QComboBox()
         self.combo_master.currentIndexChanged.connect(self.on_master_changed)
         
@@ -55,16 +56,23 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_open_folder = QtWidgets.QPushButton("Open")
         self.btn_open_folder.clicked.connect(self.open_folder_in_explorer)
         
+        self.btn_etude = QtWidgets.QPushButton("Etude")
+        self.btn_etude.clicked.connect(self.open_etude_file)
+        
         self.btn_check = QtWidgets.QPushButton("Check")
         self.btn_check.clicked.connect(self.open_lyrics_manager)
         self.btn_check.hide()
         
-        h_master.addWidget(self.combo_year)
-        h_master.addWidget(self.combo_master, 1)
-        h_master.addWidget(self.btn_rescan)
-        h_master.addWidget(self.btn_open_folder)
-        h_master.addWidget(self.btn_check)
-        left_layout.addLayout(h_master)
+        h1_master.addWidget(self.combo_year)
+        h1_master.addWidget(self.combo_master, 1)
+        
+        h2_master.addWidget(self.btn_rescan)
+        h2_master.addWidget(self.btn_open_folder)
+        h2_master.addWidget(self.btn_etude)
+        h2_master.addWidget(self.btn_check)
+        
+        left_layout.addLayout(h1_master)
+        left_layout.addLayout(h2_master)
         
         self.folder_count_label = QtWidgets.QLabel("0 archivos multimedia detectados en esta carpeta")
         left_layout.addWidget(self.folder_count_label)
@@ -117,7 +125,6 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_open_file = QtWidgets.QPushButton('Open other video')
         self.btn_open_file.clicked.connect(self.open_video_dialog)
         btns_left.addWidget(self.btn_open_file)
-        left_layout.addLayout(btns_left)
         
         self.btn_check_smb = QtWidgets.QPushButton('Check SMB')
         self.btn_check_smb.clicked.connect(self.open_smb_dialog)
@@ -127,6 +134,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_toggle_workframe.clicked.connect(self.toggle_workframe_visibility)
         btns_left.addWidget(self.btn_toggle_workframe)
         
+        left_layout.addLayout(btns_left)
         self.main_layout.addWidget(self.left_panel, 0)
 
         # ---------------- Right main area ----------------
@@ -281,6 +289,11 @@ class VideoEtude(QtWidgets.QMainWindow):
     def open_folder_in_explorer(self):
         path = self.combo_master.currentText()
         os.startfile(path)
+
+    def open_etude_file(self):
+        year = self.combo_year.currentText()
+        px = f"{int(year) - 2003:02d}"
+        os.startfile(f"{'E:/_Internal'}/{year}/{px}. identity_propeties/{px}. le_etude.overwrite.xlsx")
 
     def on_file_selected(self):
         has_file = bool(self.file_table.current_file_path())
