@@ -900,6 +900,16 @@ class FileTableWidget(QtWidgets.QTableWidget):
                         "Obtener y pegar ctime",
                         lambda: self._save_filesystem_times_from_column("real_ctime")
                     )
+                
+                if self.COLUMNS[logical_col][1] == "genre":
+                    menu.addSeparator()
+                    genre_menu = menu.addMenu("Rellenar esta columna con...")
+
+                    for genre_value in ("Episode", "Movie", "Soundtrack", "Short"):
+                        genre_menu.addAction(
+                            genre_value,
+                            lambda checked=False, value=genre_value: self.fill_genre_column_with_value(value),
+                        )
                     
                 menu.addAction(
                     "Copiar columna completa",
@@ -1156,3 +1166,32 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
             if jobs:
                 self._run_metadata_jobs(jobs)
+
+    def _genre_column(self) -> int:
+        for index, (_, key) in enumerate(self.COLUMNS):
+            if key == "genre":
+                return index
+        return -1
+
+
+    def fill_genre_column_with_value(self, value: str) -> None:
+        column = self._genre_column()
+        if column < 0 or self.rowCount() <= 0:
+            return
+
+        jobs = []
+        for row in range(self.rowCount()):
+            path = self._path_for_row(row)
+            if not path or not os.path.exists(path):
+                continue
+
+            jobs.append(
+                MetadataSaveJob(
+                    row=row,
+                    path=path,
+                    updates={"genre": value},
+                    replace_foreign_comments=False,
+                )
+            )
+
+        self._run_metadata_jobs(jobs)

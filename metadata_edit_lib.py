@@ -119,8 +119,8 @@ class ForeignCommentSummaryDialog(QtWidgets.QDialog):
         buttons_row = QtWidgets.QHBoxLayout()
         buttons_row.addStretch(1)
 
-        proceed_button = QtWidgets.QPushButton("proceder")
-        cancel_button = QtWidgets.QPushButton("cancelar")
+        proceed_button = QtWidgets.QPushButton("Proceder")
+        cancel_button = QtWidgets.QPushButton("Cancelar")
         proceed_button.clicked.connect(self.accept)
         cancel_button.clicked.connect(self.reject)
 
