@@ -1,7 +1,6 @@
 import os, re, struct, datetime, cv2, win32clipboard, subprocess, sys
 from PyQt6 import QtCore, QtGui, QtWidgets
-from ocr_lib import OCRWorker, SelectionOverlay
-from curtain_lib import CurtainOverlay
+from ocr_lib import OCRWorker
 from vidwk_lib import VideoWorker
 from cut_dialog_ex import CutDialog
 from file_table_widget import FileTableWidget
@@ -11,6 +10,8 @@ from config import *
 from utils import *
 from frame_player_panel import FramePlayerPanel
 from lyric_vision_panel import LyricVisionPanel
+from about_season_dialog import AboutSeasonDialog
+from year_selector_bar import YearSelectorBar
 
 # -----------------------
 # UI: VideoEtude main window
@@ -45,10 +46,17 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.combo_year = QtWidgets.QComboBox()
         self.combo_year.setFixedWidth(60)
         self.combo_year.currentIndexChanged.connect(self.on_year_changed)
+        self.combo_year.setVisible(False)
+        
+        self.year_selector_bar = YearSelectorBar()
+        self.year_selector_bar.yearSelected.connect(self.on_year_bar_selected)
         
         h2_master = QtWidgets.QHBoxLayout()
         self.combo_master = QtWidgets.QComboBox()
         self.combo_master.currentIndexChanged.connect(self.on_master_changed)
+        
+        self.btn_about = QtWidgets.QPushButton("About")
+        self.btn_about.clicked.connect(self.open_about_dialog)
         
         self.btn_rescan = QtWidgets.QPushButton("Refresh")
         self.btn_rescan.clicked.connect(self.rescan_current_master_folder)
@@ -63,8 +71,8 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_check.clicked.connect(self.open_lyrics_manager)
         self.btn_check.hide()
         
-        h1_master.addWidget(self.combo_year)
         h1_master.addWidget(self.combo_master, 1)
+        h1_master.addWidget(self.btn_about)
         
         h2_master.addWidget(self.btn_rescan)
         h2_master.addWidget(self.btn_open_folder)
@@ -86,7 +94,13 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.file_table = FileTableWidget()
         self.file_table.itemSelectionChanged.connect(self.on_file_selected)
         self.file_table.row_count_changed.connect(self.on_file_count_changed)
-        left_layout.addWidget(self.file_table, 1)
+        # left_layout.addWidget(self.file_table, 1)
+        
+        files_row = QtWidgets.QHBoxLayout()
+        files_row.setSpacing(6)
+        files_row.addWidget(self.year_selector_bar)
+        files_row.addWidget(self.file_table, 1)
+        left_layout.addLayout(files_row, 1)
         
         self.metadata_progress_label = QtWidgets.QLabel("0/0")
         left_layout.addWidget(self.metadata_progress_label)
@@ -211,18 +225,37 @@ class VideoEtude(QtWidgets.QMainWindow):
 
     # ---------------- Left panel helpers ----------------
     def populate_years(self):
-        self.combo_year.clear()
-        if not os.path.exists(BASE_INTERNAL_ROOT):
-            self.combo_year.addItem('(no encontrado)')
-            return
-        try:
-            entries = [d for d in os.listdir(BASE_INTERNAL_ROOT) if os.path.isdir(os.path.join(BASE_INTERNAL_ROOT, d))]
-            entries_sorted = sorted(entries)
-            for e in entries_sorted:
-                self.combo_year.addItem(e)
-        except Exception:
-            pass
+        years = [str(y) for y in range(2004, datetime.date.today().year + 1)]
 
+        self.combo_year.blockSignals(True)
+        try:
+            self.combo_year.clear()
+            self.combo_year.addItems(years)
+        finally:
+            self.combo_year.blockSignals(False)
+
+        self.year_selector_bar.set_years(years)
+
+        current_year = str(datetime.date.today().year)
+        idx = self.combo_year.findText(current_year)
+        if idx >= 0:
+            self.combo_year.setCurrentIndex(idx)
+            self.year_selector_bar.select_year(current_year, emit=False)
+            self.on_year_changed(idx)
+    
+    def on_year_bar_selected(self, year: str):
+        idx = self.combo_year.findText(year)
+        if idx < 0:
+            return
+
+        old = self.combo_year.blockSignals(True)
+        try:
+            self.combo_year.setCurrentIndex(idx)
+        finally:
+            self.combo_year.blockSignals(old)
+
+        self.on_year_changed(idx)
+        
     def on_year_changed(self, idx):
         self.exit_lyric_mode(uncheck=True)
         self.chk_lyric.hide()
@@ -294,6 +327,24 @@ class VideoEtude(QtWidgets.QMainWindow):
         year = self.combo_year.currentText()
         px = f"{int(year) - 2003:02d}"
         os.startfile(f"{'E:/_Internal'}/{year}/{px}. identity_propeties/{px}. le_etude.overwrite.xlsx")
+
+    def open_about_dialog(self):
+        year = self.combo_year.currentText().strip()
+        if not year or year == "(no encontrado)":
+            QtWidgets.QMessageBox.information(self, "About", "No hay un año válido seleccionado.")
+            return
+
+        master_path = self.combo_master.currentText().strip()
+        master_folder_name = ""
+        if master_path and master_path != "(no encontrado)":
+            master_folder_name = os.path.basename(master_path)
+
+        dlg = AboutSeasonDialog(
+            self,
+            year=year,
+            master_folder_name=master_folder_name,
+        )
+        dlg.exec()
 
     def on_file_selected(self):
         has_file = bool(self.file_table.current_file_path())
