@@ -493,18 +493,19 @@ class FileTableWidget(QtWidgets.QTableWidget):
         if not jobs:
             return
         
-        slow_jobs = [job for job in jobs if job.path and not is_moov_at_front(job.path)]
+        slow_jobs = [job for job in jobs if job.path]
         if slow_jobs and self.progress_label is not None:
             self.progress_label.setText(
-                f"Preparando... moov no está al frente; tenga paciencia ({len(slow_jobs)} archivo(s))"
+                f"Preparando... {len(slow_jobs)} archivo(s)"
             )
         
         thread = MetadataSaveThread(jobs, self)
         thread.job_started.connect(self._on_metadata_job_started)
         thread.progress.connect(self._on_metadata_progress)
+        updates_by_row = {job.row: job.updates for job in jobs}
         thread.row_saved.connect(
-            lambda r, p, ok: (
-                self._refresh_row_from_disk(r, p)
+            lambda r, p, ok, u=updates_by_row: (
+                self._apply_saved_updates_to_row(r, p, u.get(r, {}))
                 if ok else None
             )
         )
@@ -512,7 +513,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
             1,
             len(jobs),
             jobs[0].path,
-            is_moov_at_front(jobs[0].path),
+            False,
         )        
         thread.finished.connect(thread.deleteLater)
 
@@ -617,6 +618,33 @@ class FileTableWidget(QtWidgets.QTableWidget):
                     row_data.get("full_path", ""),
                 )
 
+    def _apply_saved_updates_to_row(self, row: int, path: str, updates_by_key: dict[str, str]) -> None:
+        folder = os.path.dirname(path)
+
+        if folder in self._folder_cache:
+            cached_rows = self._folder_cache[folder]
+            for cached in cached_rows:
+                if cached.get("full_path") == path:
+                    cached.update(updates_by_key)
+                    cached["filename"] = os.path.basename(path)
+                    cached["full_path"] = path
+                    break
+
+        for column, (_, key) in enumerate(self.COLUMNS):
+            item = self.item(row, column)
+            if item is None:
+                item = QtWidgets.QTableWidgetItem()
+                item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+                self.setItem(row, column, item)
+
+            if key == "filename":
+                item.setText(os.path.basename(path))
+                item.setData(QtCore.Qt.ItemDataRole.UserRole, path)
+                continue
+
+            if key in updates_by_key:
+                item.setText(str(updates_by_key[key]))
+
     def _save_row_updates(self, row: int, updates_by_column: dict[int, str]) -> bool:
         path = self._path_for_row(row)
         if not path or not os.path.exists(path):
@@ -660,8 +688,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
         thread.job_started.connect(self._on_metadata_job_started)
         thread.progress.connect(self._on_metadata_progress)
         thread.row_saved.connect(
-            lambda r, p, ok: (
-                self._refresh_row_from_disk(r, p)
+            lambda r, p, ok, u=updates_by_key: (
+                self._apply_saved_updates_to_row(r, p, u)
                 if ok else None
             )
         )
@@ -669,7 +697,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
             1,
             1,
             path,
-            is_moov_at_front(path),
+            False,
         )
         thread.finished.connect(thread.deleteLater)
 
@@ -690,6 +718,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
     def _on_metadata_job_started(self, current: int,total: int,
                                 path: str, moov_front: bool,):
+        self._moov_front_cache = getattr(self, "_moov_front_cache", {})
+        self._moov_front_cache[path] = moov_front
+        
         if self.progress_bar is not None:
             self.progress_bar.setMaximum(total)
             self.progress_bar.setValue(max(0, current - 1))
@@ -832,7 +863,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
             1,
             len(jobs),
             jobs[0].path,
-            is_moov_at_front(jobs[0].path),
+            False,
         )
 
         thread.finished.connect(thread.deleteLater)
@@ -857,9 +888,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         if self.progress_label is not None:
             filename = os.path.basename(path)
-            note = ""
-            if path and not is_moov_at_front(path):
-                note = "no moov;"
+            moov_front = getattr(self, "_moov_front_cache", {}).get(path, True)
+            note = "" if moov_front else "no moov;" 
             self.progress_label.setText(f"{note} {current}/{total} - {filename}")
 
         if current >= total and total > 0:

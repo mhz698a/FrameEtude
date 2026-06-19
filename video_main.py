@@ -40,7 +40,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         left_layout.setContentsMargins(4,4,4,4)
         left_layout.setSpacing(6)
         
-        left_layout.addWidget(QtWidgets.QLabel('<b>E:\\_Internal\\___[...]\\...\\...</b>'))
+        left_layout.addWidget(QtWidgets.QLabel('<b>E:\\_Internal\\...\\___[...]\\...\\...</b>'))
         h1_master = QtWidgets.QHBoxLayout()
         
         self.combo_year = QtWidgets.QComboBox()
