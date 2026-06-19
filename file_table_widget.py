@@ -700,7 +700,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 self.progress_label.setText(f"Procesando {current}/{total} - {filename}")
             else:
                 self.progress_label.setText(
-                    f"Procesando {current}/{total} - {filename} (moov no ahead)"
+                    f"Procesando (no moov) {current}/{total} - {filename}"
                 )
 
         if self._progress_reset_timer.isActive():
@@ -859,8 +859,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
             filename = os.path.basename(path)
             note = ""
             if path and not is_moov_at_front(path):
-                note = " — moov no ahead;"
-            self.progress_label.setText(f"{current}/{total} - {filename}{note}")
+                note = "no moov;"
+            self.progress_label.setText(f"{note} {current}/{total} - {filename}")
 
         if current >= total and total > 0:
             self._progress_reset_timer.start(10000)
