@@ -1,4 +1,4 @@
-import json, os, datetime, subprocess
+import os, datetime, subprocess
 import functools
 from ctypes import wintypes, windll
 from typing import Any
@@ -187,48 +187,62 @@ class FileTableWidget(QtWidgets.QTableWidget):
             self.row_count_changed.emit(0)
             self._sync_scrollbars()
             return
-        
+
         if self._current_folder in self._folder_cache:
             rows = self._folder_cache[self._current_folder]
-        else:
-            rows = []
-            try:
-                files = [
-                    f for f in os.listdir(self._current_folder)
-                    if os.path.isfile(os.path.join(self._current_folder, f))
-                    and os.path.splitext(f)[1].lower() in {
-                        ".mp4", ".m4v", ".mov", ".mkv", ".avi", ".wmv", ".flv"
-                    }
-                ]
-                
-                files = sorted(files, key=windows_sort_key())
+            for idx, row_data in enumerate(rows, start=1):
+                self._append_row_data(row_data)
+                self.row_count_changed.emit(idx)
+                QtWidgets.QApplication.processEvents()  
+                          
+            self._save_header_state()
+            self._sync_scrollbars()
+            self.row_count_changed.emit(len(rows))
+            self._start_duration_fetch(rows)
+            return
 
-                for filename in files:
-                    rows.append(
-                        self._read_file_row(
-                            os.path.join(self._current_folder, filename)
-                        )
-                    )
-                    
-            except Exception:
-                rows = []
-            self._folder_cache[self._current_folder] = rows
+        rows = []
+        try:
+            entries = sorted(
+                [e for e in os.scandir(self._current_folder) if e.is_file()],
+                key=lambda e: windows_sort_key()(e.name),
+            )
+            
+            for entry in entries:
+                if not entry.is_file():
+                    continue
 
-        self.setRowCount(len(rows))
-        for r, row in enumerate(rows):
-            for c, (_, key) in enumerate(self.COLUMNS):
-                item = QtWidgets.QTableWidgetItem(row.get(key, ""))
-                item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
-                item.setData(
-                    QtCore.Qt.ItemDataRole.UserRole,
-                    row.get("full_path", "") if key == "filename" else row.get(key, "")
-                )
-                self.setItem(r, c, item)
+                if os.path.splitext(entry.name)[1].lower() not in {
+                    ".mp4", ".m4v", ".mov", ".mkv", ".avi", ".wmv", ".flv"
+                }:
+                    continue
 
+                row = self._read_file_row(entry.path)
+                rows.append(row)
+                self._append_row_data(row)
+                self.row_count_changed.emit(len(rows))
+                QtWidgets.QApplication.processEvents()
+        except Exception:
+            pass
+
+        self._folder_cache[self._current_folder] = rows
         self._save_header_state()
         self._sync_scrollbars()
         self.row_count_changed.emit(len(rows))
         self._start_duration_fetch(rows)
+
+    def _append_row_data(self, row_data: dict[str, Any]) -> None:
+        row_index = self.rowCount()
+        self.insertRow(row_index)
+
+        for column, (_, key) in enumerate(self.COLUMNS):
+            item = QtWidgets.QTableWidgetItem(row_data.get(key, ""))
+            item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+            item.setData(
+                QtCore.Qt.ItemDataRole.UserRole,
+                row_data.get("full_path", "") if key == "filename" else row_data.get(key, ""),
+            )
+            self.setItem(row_index, column, item)
 
     def _sync_scrollbars(self):
         self.setVerticalScrollBarPolicy(
@@ -479,6 +493,12 @@ class FileTableWidget(QtWidgets.QTableWidget):
         if not jobs:
             return
         
+        slow_jobs = [job for job in jobs if job.path and not is_moov_at_front(job.path)]
+        if slow_jobs and self.progress_label is not None:
+            self.progress_label.setText(
+                f"Preparando... moov no está al frente; tenga paciencia ({len(slow_jobs)} archivo(s))"
+            )
+        
         thread = MetadataSaveThread(jobs, self)
         thread.job_started.connect(self._on_metadata_job_started)
         thread.progress.connect(self._on_metadata_progress)
@@ -680,7 +700,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 self.progress_label.setText(f"Procesando {current}/{total} - {filename}")
             else:
                 self.progress_label.setText(
-                    f"Procesando {current}/{total} - {filename} (moov al final, puede tardar)"
+                    f"Procesando {current}/{total} - {filename} (moov no ahead)"
                 )
 
         if self._progress_reset_timer.isActive():
@@ -837,7 +857,10 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         if self.progress_label is not None:
             filename = os.path.basename(path)
-            self.progress_label.setText(f"{current}/{total} - {filename}")
+            note = ""
+            if path and not is_moov_at_front(path):
+                note = " — moov no ahead;"
+            self.progress_label.setText(f"{current}/{total} - {filename}{note}")
 
         if current >= total and total > 0:
             self._progress_reset_timer.start(10000)
