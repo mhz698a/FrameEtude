@@ -4,6 +4,7 @@ from ctypes import wintypes, windll
 from typing import Any
 from PyQt6 import QtCore, QtGui, QtWidgets
 from config import RENAME_DIALOG_EXE, RENAME_DIALOG_SCRIPT
+from mp4_faststart_detector import is_moov_at_front
 from duration_async_lib import DurationFetchJob, DurationFetchThread
 from metadata_async_lib import MetadataSaveJob, MetadataSaveThread
 from metadata_edit_lib import (
@@ -477,8 +478,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
     def _run_metadata_jobs(self, jobs: list[MetadataSaveJob]) -> None:
         if not jobs:
             return
-
+        
         thread = MetadataSaveThread(jobs, self)
+        thread.job_started.connect(self._on_metadata_job_started)
         thread.progress.connect(self._on_metadata_progress)
         thread.row_saved.connect(
             lambda r, p, ok: (
@@ -486,6 +488,12 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 if ok else None
             )
         )
+        self._on_metadata_job_started(
+            1,
+            len(jobs),
+            jobs[0].path,
+            is_moov_at_front(jobs[0].path),
+        )        
         thread.finished.connect(thread.deleteLater)
 
         if not hasattr(self, "_metadata_threads"):
@@ -629,15 +637,20 @@ class FileTableWidget(QtWidgets.QTableWidget):
         )
 
         thread = MetadataSaveThread([job], self)
+        thread.job_started.connect(self._on_metadata_job_started)
         thread.progress.connect(self._on_metadata_progress)
-
         thread.row_saved.connect(
             lambda r, p, ok: (
                 self._refresh_row_from_disk(r, p)
                 if ok else None
             )
         )
-
+        self._on_metadata_job_started(
+            1,
+            1,
+            path,
+            is_moov_at_front(path),
+        )
         thread.finished.connect(thread.deleteLater)
 
         if not hasattr(self, "_metadata_threads"):
@@ -654,6 +667,24 @@ class FileTableWidget(QtWidgets.QTableWidget):
         thread.start()
 
         return True
+
+    def _on_metadata_job_started(self, current: int,total: int,
+                                path: str, moov_front: bool,):
+        if self.progress_bar is not None:
+            self.progress_bar.setMaximum(total)
+            self.progress_bar.setValue(max(0, current - 1))
+
+        if self.progress_label is not None:
+            filename = os.path.basename(path)
+            if moov_front:
+                self.progress_label.setText(f"Procesando {current}/{total} - {filename}")
+            else:
+                self.progress_label.setText(
+                    f"Procesando {current}/{total} - {filename} (moov al final, puede tardar)"
+                )
+
+        if self._progress_reset_timer.isActive():
+            self._progress_reset_timer.stop()
 
     def edit_current_cell(self):
         item = self.currentItem()
@@ -767,6 +798,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
             return
 
         thread = MetadataSaveThread(jobs, self)
+        thread.job_started.connect(self._on_metadata_job_started)
         thread.progress.connect(self._on_metadata_progress)
 
         thread.row_saved.connect(
@@ -774,6 +806,13 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 self._refresh_row_from_disk(r, p)
                 if ok else None
             )
+        )
+        
+        self._on_metadata_job_started(
+            1,
+            len(jobs),
+            jobs[0].path,
+            is_moov_at_front(jobs[0].path),
         )
 
         thread.finished.connect(thread.deleteLater)

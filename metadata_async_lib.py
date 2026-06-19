@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 from PyQt6 import QtCore
 from metadata_edit_lib import save_mp4_updates
-
+from mp4_faststart_detector import is_moov_at_front
 
 @dataclass
 class MetadataSaveJob:
@@ -14,6 +14,7 @@ class MetadataSaveJob:
 
 
 class MetadataSaveThread(QtCore.QThread):
+    job_started = QtCore.pyqtSignal(int, int, str, bool)
     progress = QtCore.pyqtSignal(int, int, str)
     row_saved = QtCore.pyqtSignal(int, str, bool)
     finished_batch = QtCore.pyqtSignal(list, int, int)
@@ -27,11 +28,17 @@ class MetadataSaveThread(QtCore.QThread):
         ok_count = 0
         fail_count = 0
         total = len(self._jobs)
+        
+        # NOTA: mutagen debe traer en frente a moov para modificar metadatos rapido, 
+        # si esta al final se tendra que traer al frente
+        # y puede tardar mucho depediendo del peso del archivo
 
         for index, job in enumerate(self._jobs, start=1):
             if self.isInterruptionRequested():
                 break
             
+            faststart = job.path.lower().endswith(".mp4") and is_moov_at_front(job.path)
+            self.job_started.emit(index, total, job.path, faststart)
             saved_path = job.path
             try:
                 saved_path = save_mp4_updates(

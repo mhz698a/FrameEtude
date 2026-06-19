@@ -13,7 +13,7 @@ except Exception:
 
 from wctime import setctime_blocking
 from isodatetimerng import standardize_time_range
-
+from ffmpeg_writer_api import ffmpeg_available, probe_mp4_duration_seconds, save_mp4_updates_ffmpeg
 
 
 COMMENT_KEYS = [
@@ -288,8 +288,7 @@ def save_mp4_updates(
     path: str,
     updates: dict[str, Any],
     *,
-    replace_foreign_comments: bool = False,
-) -> str:
+    replace_foreign_comments: bool = False,) -> str:
     
     if MP4 is None:
         raise RuntimeError("mutagen.mp4 no está disponible.")
