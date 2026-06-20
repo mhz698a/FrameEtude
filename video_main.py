@@ -326,7 +326,7 @@ class VideoEtude(QtWidgets.QMainWindow):
     def open_etude_file(self):
         year = self.combo_year.currentText()
         px = f"{int(year) - 2003:02d}"
-        os.startfile(f"{'E:/_Internal'}/{year}/{px}. identity_propeties/{px}. le_etude.overwrite.xlsx")
+        os.startfile(f"{'E:/_Internal'}/{year}/{px}. identity/{px}. le_etude.overwrite.xlsx")
 
     def open_about_dialog(self):
         year = self.combo_year.currentText().strip()
