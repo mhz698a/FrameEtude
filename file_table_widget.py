@@ -1,10 +1,9 @@
-import os, datetime, subprocess
+import os, datetime, subprocess, re
 import functools
 from ctypes import wintypes, windll
 from typing import Any
 from PyQt6 import QtCore, QtGui, QtWidgets
 from config import RENAME_DIALOG_EXE, RENAME_DIALOG_SCRIPT
-from mp4_faststart_detector import is_moov_at_front
 from duration_async_lib import DurationFetchJob, DurationFetchThread
 from metadata_async_lib import MetadataSaveJob, MetadataSaveThread
 from metadata_edit_lib import (
@@ -1002,6 +1001,18 @@ class FileTableWidget(QtWidgets.QTableWidget):
                             genre_value,
                             lambda checked=False, value=genre_value: self.fill_genre_column_with_value(value),
                         )
+                        
+                if self.COLUMNS[logical_col][1] == "release_date":
+                    menu.addSeparator()
+                    release_menu = menu.addMenu("Obtener fechas del filename")
+                    release_menu.addAction(
+                        "Obtener solo desde este archivo",
+                        lambda: self._save_release_date_from_filename(index.row()),
+                    )
+                    release_menu.addAction(
+                        "Asignar a toda esta columna",
+                        self._save_release_dates_from_filenames,
+                    )
                     
                 menu.addAction(
                     "Copiar columna completa",
@@ -1287,3 +1298,74 @@ class FileTableWidget(QtWidgets.QTableWidget):
             )
 
         self._run_metadata_jobs(jobs)
+
+    def _release_date_from_filename(self, path: str) -> str:
+        filename = os.path.basename(path)
+
+        for match in re.finditer(r'(?<!\d)((?:19|20)\d{2})-(\d{2})-(\d{2})(?!\d)', filename):
+            year, month, day = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+            try:
+                datetime.date(year, month, day)
+            except ValueError:
+                continue
+            return f"{year:04d}-{month:02d}-{day:02d}"
+
+        return ""
+
+    def _release_date_column_index(self) -> int:
+        for index, (_, key) in enumerate(self.COLUMNS):
+            if key == "release_date":
+                return index
+        return -1
+
+    def _save_release_date_from_filename(self, row: int) -> None:
+        path = self._path_for_row(row)
+        if not path or not os.path.exists(path):
+            return
+
+        value = self._release_date_from_filename(path)
+        if not value:
+            return
+
+        release_col = self._release_date_column_index()
+        if release_col < 0:
+            return
+
+        self._save_row_updates(row, {release_col: value})
+
+    def _save_release_dates_from_filenames(self) -> None:
+        if self.rowCount() <= 0:
+            return
+
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            "Obtener fechas del filename",
+            "Esto aplicará el cambio desde la primera fila hasta la última.\n¿Continuar?",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No,
+        )
+        if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+            return
+
+        jobs: list[MetadataSaveJob] = []
+
+        for row in range(self.rowCount()):
+            path = self._path_for_row(row)
+            if not path or not os.path.exists(path):
+                continue
+
+            value = self._release_date_from_filename(path)
+            if not value:
+                continue
+
+            jobs.append(
+                MetadataSaveJob(
+                    row=row,
+                    path=path,
+                    updates={"release_date": value},
+                    replace_foreign_comments=False,
+                )
+            )
+
+        if jobs:
+            self._run_metadata_jobs(jobs)
