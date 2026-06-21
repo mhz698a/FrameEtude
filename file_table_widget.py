@@ -1014,6 +1014,20 @@ class FileTableWidget(QtWidgets.QTableWidget):
                         self._save_release_dates_from_filenames,
                     )
                     
+                if self.COLUMNS[logical_col][1] == "disk":
+                    menu.addSeparator()
+                    disk_menu = menu.addMenu("Agregar numero de disco/temporada")
+
+                    disk_menu.addAction(
+                        "Aplicar solo a este archivo",
+                        lambda row=index.row(): self._apply_disk_season_to_row(row),
+                    )
+
+                    disk_menu.addAction(
+                        "Aplicar en toda la columna",
+                        lambda col=logical_col: self._apply_disk_season_to_column(col),
+                    )
+                
                 menu.addAction(
                     "Copiar columna completa",
                     lambda col=logical_col: self.copy_column(col, include_header=True)
@@ -1140,6 +1154,17 @@ class FileTableWidget(QtWidgets.QTableWidget):
         value = QtWidgets.QApplication.clipboard().text()
         if not value.strip():
             return
+        
+        reply = QtWidgets.QMessageBox.warning(
+            self,
+            "Advertencia",
+            f"Rellenaras esta columna con un solo valor. Si estas pegando más valores esta no es la opcion.\n\n¿Deseas proceder?",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No
+        )
+        
+        if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+            return
 
         jobs = []
         foreign_entries: list[tuple[str, str]] = []
@@ -1222,53 +1247,54 @@ class FileTableWidget(QtWidgets.QTableWidget):
             self._run_metadata_jobs(jobs)
 
     def fill_column_with_voids(self, column: int):
-            if column <= 0 or column >= self.columnCount():
-                return
+        if column <= 0 or column >= self.columnCount():
+            return
 
-            key = self.COLUMNS[column][1]
-            if key == "duration":
-                return
-            
-            reply = QtWidgets.QMessageBox.warning(
-                self,
-                "Advertencia de borrado",
-                f"Se vaciará toda la columna '{key}'. Asegúrate de respaldar la información antes de continuar.\n\n¿Deseas proceder?",
-                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
-                QtWidgets.QMessageBox.StandardButton.No
-            )
-            
-            if reply != QtWidgets.QMessageBox.StandardButton.Yes:
-                return
-            
-            value = ''
-            
-            jobs = []
+        key = self.COLUMNS[column][1]
+        if key == "duration":
+            return
+        
+        reply = QtWidgets.QMessageBox.warning(
+            self,
+            "Advertencia de borrado",
+            f"Se vaciará toda la columna '{key}'. Asegúrate de respaldar la información antes de continuar.\n\n¿Deseas proceder?",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No
+        )
+        
+        if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+            return
+        
+        value = ''
+        
+        jobs = []
 
-            for row in range(self.rowCount()):
-                path = self._path_for_row(row)
-                if not path or not os.path.exists(path):
-                    continue
+        for row in range(self.rowCount()):
+            path = self._path_for_row(row)
+            if not path or not os.path.exists(path):
+                continue
 
-                replace_foreign = False
-                if key in COMMENT_KEYS:
-                    status, existing_text = comment_status_from_path(path)
-                    if status == "foreign":
-                        dlg = ForeignCommentDialog(self, existing_text)
-                        if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
-                            return
-                        replace_foreign = True
+            replace_foreign = False
+            if key in COMMENT_KEYS:
+                status, existing_text = comment_status_from_path(path)
+                if status == "foreign":
+                    dlg = ForeignCommentDialog(self, existing_text)
+                    if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                        return
+                    replace_foreign = True
 
-                jobs.append(
-                    MetadataSaveJob(
-                        row=row,
-                        path=path,
-                        updates={key: value},
-                        replace_foreign_comments=replace_foreign,
-                    )
+            jobs.append(
+                MetadataSaveJob(
+                    row=row,
+                    path=path,
+                    updates={key: value},
+                    replace_foreign_comments=replace_foreign,
                 )
+            )
 
-            if jobs:
-                self._run_metadata_jobs(jobs)
+        if jobs:
+            self._run_metadata_jobs(jobs)
+
 
     def _genre_column(self) -> int:
         for index, (_, key) in enumerate(self.COLUMNS):
@@ -1363,6 +1389,63 @@ class FileTableWidget(QtWidgets.QTableWidget):
                     row=row,
                     path=path,
                     updates={"release_date": value},
+                    replace_foreign_comments=False,
+                )
+            )
+
+        if jobs:
+            self._run_metadata_jobs(jobs)
+            
+    def _selected_year_px(self) -> str:
+        window = self.window()
+        combo_year = getattr(window, "combo_year", None)
+        year = combo_year.currentText().strip() if combo_year else ""
+
+        if not year or year == "(no encontrado)":
+            return ""
+
+        try:
+            return f"{int(year) - 2003:02d}"
+        except ValueError:
+            return ""
+
+    def _disk_column_index(self) -> int:
+        for index, (_, key) in enumerate(self.COLUMNS):
+            if key == "disk":
+                return index
+        return -1
+
+    def _apply_disk_season_to_row(self, row: int) -> None:
+        px = self._selected_year_px()
+        if not px:
+            return
+
+        disk_col = self._disk_column_index()
+        if disk_col < 0:
+            return
+
+        self._save_row_updates(row, {disk_col: px})
+
+    def _apply_disk_season_to_column(self, column: int) -> None:
+        px = self._selected_year_px()
+        if not px:
+            return
+
+        if column < 0 or column >= self.columnCount():
+            return
+
+        jobs: list[MetadataSaveJob] = []
+
+        for row in range(self.rowCount()):
+            path = self._path_for_row(row)
+            if not path or not os.path.exists(path):
+                continue
+
+            jobs.append(
+                MetadataSaveJob(
+                    row=row,
+                    path=path,
+                    updates={self.COLUMNS[column][1]: px},
                     replace_foreign_comments=False,
                 )
             )

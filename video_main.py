@@ -67,6 +67,9 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_etude = QtWidgets.QPushButton("Etude")
         self.btn_etude.clicked.connect(self.open_etude_file)
         
+        self.btn_eptmp = QtWidgets.QPushButton("Get Titles Ep")
+        self.btn_eptmp.clicked.connect(self.get_episode_titles_temp)
+        
         self.btn_check = QtWidgets.QPushButton("Check")
         self.btn_check.clicked.connect(self.open_lyrics_manager)
         self.btn_check.hide()
@@ -77,6 +80,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         h2_master.addWidget(self.btn_rescan)
         h2_master.addWidget(self.btn_open_folder)
         h2_master.addWidget(self.btn_etude)
+        h2_master.addWidget(self.btn_eptmp)
         h2_master.addWidget(self.btn_check)
         
         left_layout.addLayout(h1_master)
@@ -327,6 +331,18 @@ class VideoEtude(QtWidgets.QMainWindow):
         year = self.combo_year.currentText()
         px = f"{int(year) - 2003:02d}"
         os.startfile(f"{'E:/_Internal'}/{year}/{px}. identity/{px}. le_etude.overwrite.xlsx")
+
+    def get_episode_titles_temp(self):
+        py_execute = sys.executable  
+        cur_fr_script = os.path.dirname(os.path.abspath(__file__))
+        child_script = os.path.join(cur_fr_script, "temporal_filtrar_material_list.pyw")
+        year = self.combo_year.currentText()
+        CREATE_NO_WINDOW = 0x08000000
+
+        subprocess.Popen(
+            [py_execute, child_script, year],
+            creationflags=CREATE_NO_WINDOW
+        )
 
     def open_about_dialog(self):
         year = self.combo_year.currentText().strip()
