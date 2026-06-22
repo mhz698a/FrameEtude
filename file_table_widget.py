@@ -345,9 +345,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 used.add(number)
 
         return used
-
-    def _set_track_number(self, row: int, number: int) -> None:
-        total = self.rowCount()
+        
+    def _set_track_number(self, row: int, number: int, total: int | None = None) -> None:
+        total = total if total is not None and total > 0 else self.rowCount()
         track_col = self._track_column_index()
         if track_col < 0 or total <= 0:
             return
@@ -359,24 +359,23 @@ class FileTableWidget(QtWidgets.QTableWidget):
             return
         self._save_row_updates(row, {track_col: ""})
 
-    def _assign_remaining_track_numbers(self) -> None:
-        total = self.rowCount()
+    def _assign_remaining_track_numbers(self, total_override: int | None = None) -> None:
+        total = total_override if total_override is not None and total_override > 0 else self.rowCount()
         track_col = self._track_column_index()
         if track_col < 0 or total <= 0:
             return
 
         used = self._used_track_numbers()
         available = [n for n in range(1, total + 1) if n not in used]
-        jobs: list[MetadataSaveJob] = []
 
-        for row in range(total):
+        jobs: list[MetadataSaveJob] = []
+        for row in range(self.rowCount()):
             if not available:
                 break
 
             path = self._path_for_row(row)
             if not path or not os.path.exists(path):
                 continue
-
             if self._track_number_from_row(row) is not None:
                 continue
 
@@ -392,6 +391,22 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         if jobs:
             self._run_metadata_jobs(jobs)
+
+    def _assign_remaining_track_numbers_custom_total(self) -> None:
+        current_total = self.rowCount() if self.rowCount() > 0 else 1
+        total, ok = QtWidgets.QInputDialog.getInt(
+            self,
+            "Diferent Total Tracks",
+            "Total Tracks:",
+            current_total,
+            1,
+            99999,
+            1,
+        )
+        if not ok:
+            return
+
+        self._assign_remaining_track_numbers(total)
 
     def _foreign_comment_summary_text(self, entries: list[tuple[str, str]]) -> str:
         blocks = []
@@ -463,6 +478,10 @@ class FileTableWidget(QtWidgets.QTableWidget):
         track_menu.addAction(
             "Revocar numero de pista",
             lambda _checked=False, r=row: self._revoke_track_number(r),
+        )
+        track_menu.addAction(
+            "Asignar el resto pero con total diferente",
+            lambda _checked=False: self._assign_remaining_track_numbers_custom_total(),
         )
 
     def _parse_clipboard_matrix(self) -> list[list[str]]:

@@ -9,9 +9,11 @@ QPushButton {
     border-radius: 6px; 
     color: #e6e6e6; 
 }
+
 QPushButton:hover { background-color: #4a4a4c; }
 QPushButton:pressed { background-color: #2e88ff; color: white; }
 QPushButton:disabled { background-color: #2a2a2a; color: #888888; }
+
 QLineEdit { 
     background-color: #1e1e1f; 
     border: 1px solid #2b2b2d; 
@@ -51,6 +53,21 @@ QComboBox QAbstractItemView {
     background-color: #1e1e1f;
     selection-background-color: #2e88ff;
     color: #e6e6e6;
+}
+"""
+
+Old_qss = """
+QScrollBar:vertical {
+    background: #1e1e1f;
+    width: 10px;
+}
+QScrollBar::handle:vertical {
+    background: #3a3a3c;
+    min-height: 20px;
+    border-radius: 4px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #4a4a4c;
 }
 
 QSpinBox, QDoubleSpinBox {
@@ -105,20 +122,5 @@ QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
     border-left: 4px solid transparent;
     border-right: 4px solid transparent;
     border-top: 6px solid #e6e6e6;
-}
-"""
-
-Old_qss = """
-QScrollBar:vertical {
-    background: #1e1e1f;
-    width: 10px;
-}
-QScrollBar::handle:vertical {
-    background: #3a3a3c;
-    min-height: 20px;
-    border-radius: 4px;
-}
-QScrollBar::handle:vertical:hover {
-    background: #4a4a4c;
 }
 """
