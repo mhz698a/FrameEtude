@@ -276,7 +276,9 @@ class VideoEtude(QtWidgets.QMainWindow):
         year = self.combo_year.currentText()
         if not year or year == '(no encontrado)':
             return
+        
         year_path = os.path.join(BASE_INTERNAL_ROOT, year)
+        
         # buscar carpeta que contenga '___[' en su nombre
         found = None
         try:
@@ -290,6 +292,14 @@ class VideoEtude(QtWidgets.QMainWindow):
         if not found:
             self.combo_master.addItem('(no encontrado)')
             return
+        
+        try:
+            hide_overwrite_1 = int(year) >= 2026
+        except ValueError:
+            hide_overwrite_1 = False
+
+        self.file_table.set_overwrite_1_hidden(hide_overwrite_1)
+        
         # listar subcarpetas de found
         try:
             subs = [d for d in os.listdir(found) if os.path.isdir(os.path.join(found, d))]
@@ -298,6 +308,8 @@ class VideoEtude(QtWidgets.QMainWindow):
                 self.combo_master.addItem(os.path.join(found, s))
         except Exception:
             self.combo_master.addItem('(no encontrado)')
+
+
 
     def on_master_changed(self, idx):
         self.exit_lyric_mode(uncheck=True)

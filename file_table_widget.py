@@ -13,6 +13,7 @@ from metadata_edit_lib import (
     comment_display_value,
     comment_status_from_path,
 )
+from about_season_dialog import load_seasons_for_year
 
 try:
     from mutagen.mp4 import MP4
@@ -958,6 +959,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
             if index.isValid():
                 
                 logical_col = index.column()
+                logical_key = self.COLUMNS[logical_col][1]
+                
                 header_text = (
                     self.horizontalHeaderItem(logical_col).text()
                     if self.horizontalHeaderItem(logical_col)
@@ -992,28 +995,36 @@ class FileTableWidget(QtWidgets.QTableWidget):
                     lambda _=False, t=header_text: self.copy_to_clipboard(t)
                 )
                 
-                if self.COLUMNS[logical_col][1] == "track":
+                if logical_key in ("album", "artist"):
+                    menu.addSeparator()
+                    self._add_season_context_menu(menu, index.row(), logical_col)
+                                    
+                if logical_key == "track":
                     menu.addSeparator()
                     self._add_track_context_menu(menu, index.row())
                                     
-                # if logical_col in (8, 9):
-                if self.COLUMNS[logical_col][1] == "real_mtime":
+
+                if logical_key == "real_ctime":
                     menu.addSeparator()
                     menu.addAction(
-                        "Obtener y pegar mtime",
-                        lambda: self._save_filesystem_times_from_column("real_mtime")
-                    )
-                
-                if self.COLUMNS[logical_col][1] == "real_ctime":
-                    menu.addSeparator()
-                    menu.addAction(
-                        "Obtener y pegar ctime",
+                        "Rellenar esta columna con ctime",
                         lambda: self._save_filesystem_times_from_column("real_ctime")
                     )
+                    self._add_real_timestamp_single_context_menu(menu, index.row(), logical_col)
                 
-                if self.COLUMNS[logical_col][1] == "genre":
+                
+                if logical_key == "real_mtime":
                     menu.addSeparator()
-                    genre_menu = menu.addMenu("Rellenar esta columna con...")
+                    menu.addAction(
+                        "Rellenar esta columna con mtime",
+                        lambda: self._save_filesystem_times_from_column("real_mtime")
+                    )
+                    self._add_real_timestamp_single_context_menu(menu, index.row(), logical_col)
+                                
+
+                if logical_key == "genre":
+                    menu.addSeparator()
+                    genre_menu = menu.addMenu("Colocar tipo a toda la columna")
 
                     for genre_value in ("Episode", "Movie", "Soundtrack", "Short"):
                         genre_menu.addAction(
@@ -1021,7 +1032,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
                             lambda checked=False, value=genre_value: self.fill_genre_column_with_value(value),
                         )
                         
-                if self.COLUMNS[logical_col][1] == "release_date":
+                    self._add_genre_single_context_menu(menu, index.row(), logical_col)
+                        
+                if logical_key == "release_date":
                     menu.addSeparator()
                     release_menu = menu.addMenu("Obtener fechas del filename")
                     release_menu.addAction(
@@ -1033,7 +1046,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
                         self._save_release_dates_from_filenames,
                     )
                     
-                if self.COLUMNS[logical_col][1] == "disk":
+                if logical_key == "disk":
                     menu.addSeparator()
                     disk_menu = menu.addMenu("Agregar numero de disco/temporada")
 
@@ -1046,7 +1059,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
                         "Aplicar en toda la columna",
                         lambda col=logical_col: self._apply_disk_season_to_column(col),
                     )
-                
+                    
+                menu.addSeparator()                
                 menu.addAction(
                     "Copiar columna completa",
                     lambda col=logical_col: self.copy_column(col, include_header=True)
@@ -1055,6 +1069,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
                     "Copiar columna sin encabezado",
                     lambda col=logical_col: self.copy_column(col, include_header=False)
                 )
+                
                 menu.addSeparator()
                 menu.addAction(
                     "Ajustar esta columna al contenido",
@@ -1064,6 +1079,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
                     "Ajustar todas las columnas al contenido",
                     self.resize_all_columns_to_content
                 )
+                
                 menu.addSeparator()
                 menu.addAction(
                     "Copiar tabla con encabezados",
@@ -1427,6 +1443,19 @@ class FileTableWidget(QtWidgets.QTableWidget):
             return f"{int(year) - 2003:02d}"
         except ValueError:
             return ""
+        
+    def _selected_year_full(self) -> str:
+        window = self.window()
+        combo_year = getattr(window, "combo_year", None)
+        year = combo_year.currentText().strip() if combo_year else ""
+
+        if not year or year == "(no encontrado)":
+            return ""
+
+        try:
+            return str(year)
+        except ValueError:
+            return ""
 
     def _disk_column_index(self) -> int:
         for index, (_, key) in enumerate(self.COLUMNS):
@@ -1471,3 +1500,151 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         if jobs:
             self._run_metadata_jobs(jobs)
+    
+    def set_overwrite_1_hidden(self, hidden: bool) -> None:
+        for column, (_, key) in enumerate(self.COLUMNS):
+            if key == "overwrite_1_times":
+                self.setColumnHidden(column, hidden)
+                break
+
+
+    def _column_index_by_key(self, key: str) -> int:
+        for index, (_, current_key) in enumerate(self.COLUMNS):
+            if current_key == key:
+                return index
+        return -1
+
+
+    def _release_year_for_row(self, row: int) -> str:
+        release_col = self._column_index_by_key("release_date")
+        if release_col < 0:
+            return ""
+
+        item = self.item(row, release_col)
+        text = self._safe_text(item.text() if item else "")
+        match = re.search(r"(\d{4})", text)
+        return match.group(1) if match else ""
+
+
+    def _season_names_for_row(self, row: int) -> list[str]:
+        year = self._selected_year_full()
+        if not year:
+            return []
+
+        names: list[str] = []
+        for record in load_seasons_for_year(year):
+            name = self._safe_text(record.get("precure_season_name", ""))
+            if name:
+                names.append(name)
+        return names
+
+
+    def _apply_value_to_column(self, column: int, value: str, *, only_row: int | None = None) -> None:
+        if column <= 0 or column >= self.columnCount():
+            return
+
+        if only_row is not None:
+            self._save_row_updates(only_row, {column: value})
+            return
+
+        key = self.COLUMNS[column][1]
+        if key == "duration":
+            return
+
+        jobs: list[MetadataSaveJob] = []
+        for row in range(self.rowCount()):
+            path = self._path_for_row(row)
+            if not path or not os.path.exists(path):
+                continue
+
+            jobs.append(
+                MetadataSaveJob(
+                    row=row,
+                    path=path,
+                    updates={key: value},
+                    replace_foreign_comments=False,
+                )
+            )
+
+        if jobs:
+            self._run_metadata_jobs(jobs)
+
+
+    def _add_season_context_menu(self, menu: QtWidgets.QMenu, row: int, column: int) -> None:
+        key = self.COLUMNS[column][1]
+        if key not in ("album", "artist"):
+            return
+
+        season_menu = menu.addMenu("Obtener Temporada/Sp")
+        single_menu = season_menu.addMenu("Aplicar solo a este archivo")
+        column_menu = season_menu.addMenu("Aplicar a toda la columna")
+
+        names = self._season_names_for_row(row)
+        if not names:
+            a1 = single_menu.addAction("Sin valores para este año")
+            a1.setEnabled(False)
+            a2 = column_menu.addAction("Sin valores para este año")
+            a2.setEnabled(False)
+            return
+
+        for name in names:
+            single_menu.addAction(
+                name,
+                lambda _checked=False, col=column, r=row, v=name: self._apply_value_to_column(col, v, only_row=r),
+            )
+            column_menu.addAction(
+                name,
+                lambda _checked=False, col=column, v=name: self._apply_value_to_column(col, v),
+            )
+
+
+    def _add_genre_single_context_menu(self, menu: QtWidgets.QMenu, row: int, column: int) -> None:
+        if self.COLUMNS[column][1] != "genre":
+            return
+
+        genre_menu = menu.addMenu("Colocar tipo solo a este archivo")
+        for value in ("Episode", "Movie", "Soundtrack", "Short"):
+            genre_menu.addAction(
+                value,
+                lambda _checked=False, r=row, c=column, v=value: self._save_row_updates(r, {c: v}),
+            )
+
+
+    def _save_single_row_filesystem_time(self, row: int, column: int, target_key: str) -> None:
+        path = self._path_for_row(row)
+        if not path or not os.path.exists(path):
+            return
+
+        title = "Obtener ctime solo para este archivo" if target_key == "real_ctime" else "Obtener mtime solo para este archivo"
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            title,
+            "Esto aplicará el cambio solo a este archivo.\n¿Continuar?",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No,
+        )
+        if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+            return
+
+        ts_kind = "ctime" if target_key == "real_ctime" else "mtime"
+        value = self._filesystem_timestamp_text(path, ts_kind)
+        if not value:
+            return
+
+        self._save_row_updates(row, {column: value})
+
+
+    def _add_real_timestamp_single_context_menu(self, menu: QtWidgets.QMenu, row: int, column: int) -> None:
+        key = self.COLUMNS[column][1]
+        if key not in ("real_ctime", "real_mtime"):
+            return
+
+        label = (
+            "Obtener ctime solo para este archivo"
+            if key == "real_ctime"
+            else "Obtener mtime solo para este archivo"
+        )
+        menu.addAction(
+            label,
+            lambda _checked=False, r=row, c=column, k=key: self._save_single_row_filesystem_time(r, c, k),
+        )
