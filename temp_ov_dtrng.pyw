@@ -6,7 +6,10 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 
 
 SHEET_NAME = "overwrite_registry"
-FILTER_Q_VALUE_1 = "Overwrite I - Sobrescritura de FlamaNova & HormaNova"
+FILTER_Q_VALUES_1 = {
+    "Overwrite I - Sobrescritura de FlamaNova & HormaNova",
+    "Overwrite I - Handler de Dorothy | Post FlamaNova",
+}
 FILTER_Q_VALUES_2 = {
     "Overwrite II - Le Etude de Dorothée",
     "Overwrite II - Sobrescritura de Dorothy & Lissette",
@@ -140,7 +143,7 @@ def main() -> int:
     version = sys.argv[2]
 
     if version == "1":
-        filter_q_values = {FILTER_Q_VALUE_1}
+        filter_q_values = FILTER_Q_VALUES_1
     elif version == "2":
         filter_q_values = FILTER_Q_VALUES_2
     else:
