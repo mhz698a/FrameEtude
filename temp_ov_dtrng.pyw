@@ -54,6 +54,14 @@ def main() -> int:
         raise KeyError(f"La hoja '{SHEET_NAME}' no existe en el archivo.")
 
     ws = wb[SHEET_NAME]
+    
+    for row in range(4, 15):
+        print(
+            row,
+            "E=", repr(ws[f"E{row}"].value),
+            "Q=", repr(ws[f"Q{row}"].value),
+            "L=", repr(ws[f"L{row}"].value),
+        )
 
     copied_values: list[str] = []
 
