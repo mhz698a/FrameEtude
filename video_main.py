@@ -67,6 +67,12 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_etude = QtWidgets.QPushButton("Etude")
         self.btn_etude.clicked.connect(self.open_etude_file)
         
+        self.btn_ovreg1 = QtWidgets.QPushButton("Get Ov1 Reg")
+        self.btn_ovreg1.clicked.connect(lambda: self.get_reg_ov_temp("1"))
+        
+        self.btn_ovreg2 = QtWidgets.QPushButton("Get Ov2 Reg")
+        self.btn_ovreg2.clicked.connect(lambda: self.get_reg_ov_temp("2"))
+        
         self.btn_eptmp = QtWidgets.QPushButton("Get Titles Ep")
         self.btn_eptmp.clicked.connect(self.get_episode_titles_temp)
         
@@ -80,6 +86,8 @@ class VideoEtude(QtWidgets.QMainWindow):
         h2_master.addWidget(self.btn_rescan)
         h2_master.addWidget(self.btn_open_folder)
         h2_master.addWidget(self.btn_etude)
+        h2_master.addWidget(self.btn_ovreg1)
+        h2_master.addWidget(self.btn_ovreg2)        
         h2_master.addWidget(self.btn_eptmp)
         h2_master.addWidget(self.btn_check)
         
@@ -331,6 +339,19 @@ class VideoEtude(QtWidgets.QMainWindow):
         year = self.combo_year.currentText()
         px = f"{int(year) - 2003:02d}"
         os.startfile(f"{'E:/_Internal'}/{year}/{px}. identity/{px}. le_etude.overwrite.xlsx")
+
+
+    def get_reg_ov_temp(self, ov_ver: str):
+        py_execute = sys.executable  
+        cur_fr_script = os.path.dirname(os.path.abspath(__file__))
+        child_script = os.path.join(cur_fr_script, "temp_ov_dtrng.pyw")
+        year = self.combo_year.currentText()
+        CREATE_NO_WINDOW = 0x08000000
+
+        subprocess.Popen(
+            [py_execute, child_script, year, ov_ver],
+            creationflags=CREATE_NO_WINDOW
+        )
 
     def get_episode_titles_temp(self):
         py_execute = sys.executable  
