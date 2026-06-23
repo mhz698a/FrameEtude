@@ -356,7 +356,7 @@ class VideoEtude(QtWidgets.QMainWindow):
     def get_episode_titles_temp(self):
         py_execute = sys.executable  
         cur_fr_script = os.path.dirname(os.path.abspath(__file__))
-        child_script = os.path.join(cur_fr_script, "temporal_filtrar_material_list.pyw")
+        child_script = os.path.join(cur_fr_script, "temp_eps_list_get.pyw")
         year = self.combo_year.currentText()
         CREATE_NO_WINDOW = 0x08000000
 
