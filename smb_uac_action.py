@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import locale
 import sys
 from pathlib import Path
 
@@ -29,7 +30,7 @@ def _find_share_by_folder(manager: WindowsShareManager, folder_path: str):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", required=True, choices=["connect", "disconnect"])
+    parser.add_argument("--action", required=True, choices=["connect", "connect_full", "disconnect"])
     parser.add_argument("--folder", required=True)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
@@ -43,7 +44,7 @@ def main():
         if not os.path.isdir(folder):
             raise RuntimeError("La carpeta no existe o no es accesible.")
 
-        if args.action == "connect":
+        if args.action in ("connect", "connect_full"):
             share = _find_share_by_folder(manager, folder)
             if share:
                 payload = {
@@ -56,12 +57,35 @@ def main():
             else:
                 base_name = Path(folder).name.strip() or "SharedFolder"
                 share_name = WindowsShareManager.normalizar_share_name(base_name)
-                manager.compartir_carpeta(folder, share_name)
+                
+                if args.action == "connect_full":
+                    everyone_name = "Everyone"
+                    lang = locale.getdefaultlocale()[0] or ""
+                    if lang.startswith("es"):
+                        everyone_name = "Todos"
+                    manager.compartir_carpeta(
+                        folder,
+                        share_name,
+                        full_access=[everyone_name],
+                    )
+                else:
+                    manager.compartir_carpeta(
+                        folder,
+                        share_name,
+                    )
+                    
                 share = _find_share_by_folder(manager, folder)
+                
+                msg = "Recurso compartido creado correctamente."
+                if args.action == "connect_full":
+                    msg = (
+                        "Recurso compartido creado con acceso completo "
+                        "para Everyone."
+                    )
                 payload = {
                     "ok": True,
                     "level": "ok",
-                    "messages": ["Recurso compartido creado correctamente."],
+                    "messages": [msg],
                     "share": share,
                 }
 

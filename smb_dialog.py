@@ -129,8 +129,7 @@ class SMBWorker(QtCore.QObject):
             share_name = "SharedFolder"
 
         self.log.emit("info", f"Creando recurso compartido: {share_name}")
-        current_user = os.environ.get("USERNAME", "Administrador")
-        manager.compartir_carpeta(self.folder_path, share_name, full_access=[current_user])
+        manager.compartir_carpeta(self.folder_path, share_name)
         self.log.emit("ok", "Recurso compartido creado correctamente.")
 
         share = self._find_share_by_folder(manager)
@@ -197,13 +196,16 @@ class SMBDialog(QtWidgets.QDialog):
         self.icon_search = QtGui.QIcon(self.search_pixel)
 
         row1 = QtWidgets.QHBoxLayout()
-        self.btn_connect = QtWidgets.QPushButton(" Conectar")
+        self.btn_connect = QtWidgets.QPushButton(" Conectar solo para enviar")
+        self.btn_connect_full = QtWidgets.QPushButton(" Conectar con Acceso completo")
         self.btn_check = QtWidgets.QPushButton(" Comprobar estado")
         self.btn_disconnect = QtWidgets.QPushButton(" Desconectar")
         self.btn_connect.setIcon(self.icon_uac)
+        self.btn_connect_full.setIcon(self.icon_uac)
         self.btn_check.setIcon(self.icon_search)
         self.btn_disconnect.setIcon(self.icon_uac)
         row1.addWidget(self.btn_connect)
+        row1.addWidget(self.btn_connect_full)
         row1.addWidget(self.btn_check)
         row1.addWidget(self.btn_disconnect)
         layout.addLayout(row1)
@@ -217,6 +219,7 @@ class SMBDialog(QtWidgets.QDialog):
         layout.addLayout(row2)
 
         self.btn_connect.clicked.connect(lambda: self._start_action("connect"))
+        self.btn_connect_full.clicked.connect(lambda: self._start_action("connect_full"))
         self.btn_check.clicked.connect(lambda: self._start_action("check"))
         self.btn_disconnect.clicked.connect(lambda: self._start_action("disconnect"))
         self.btn_clear.clicked.connect(self.log_view.clear)
@@ -224,6 +227,7 @@ class SMBDialog(QtWidgets.QDialog):
 
     def _set_busy(self, busy: bool):
         self.btn_connect.setEnabled(not busy)
+        self.btn_connect_full.setEnabled(not busy)
         self.btn_check.setEnabled(not busy)
         self.btn_disconnect.setEnabled(not busy)
         self.btn_clear.setEnabled(not busy)
@@ -253,7 +257,7 @@ class SMBDialog(QtWidgets.QDialog):
         if self._thread is not None:
             return
 
-        if action in {"connect", "disconnect"}:
+        if action in {"connect", "connect_full", "disconnect"}:
             self._start_elevated_action(action)
             return
 
