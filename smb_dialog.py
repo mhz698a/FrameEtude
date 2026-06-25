@@ -129,7 +129,8 @@ class SMBWorker(QtCore.QObject):
             share_name = "SharedFolder"
 
         self.log.emit("info", f"Creando recurso compartido: {share_name}")
-        manager.compartir_carpeta(self.folder_path, share_name)
+        current_user = os.environ.get("USERNAME", "Administrador")
+        manager.compartir_carpeta(self.folder_path, share_name, full_access=[current_user])
         self.log.emit("ok", "Recurso compartido creado correctamente.")
 
         share = self._find_share_by_folder(manager)
