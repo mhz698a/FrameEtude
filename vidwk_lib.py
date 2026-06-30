@@ -1,4 +1,5 @@
 import collections, cv2
+import config
 from config import *
 from PyQt6 import QtCore, QtGui, QtWidgets
 
@@ -93,15 +94,19 @@ class VideoWorker(QtCore.QObject):
         self.last_sequential = pos
         return pos, rgb
 
-    @QtCore.pyqtSlot(int, bool)
-    def request_frames(self, center_frame, show_adjacent):
+    @QtCore.pyqtSlot(int, bool, int)
+    def request_frames(self, center_frame, show_adjacent, num_thumbs=None):
+        if num_thumbs is None:
+            num_thumbs = config.NUM_THUMBS
+
         with QtCore.QMutexLocker(self._lock):
             if self.cap is None:
                 self.error.emit("No hay video abierto.")
                 return
             center_frame = max(0, min(center_frame, self.frame_count - 1))
             if show_adjacent:
-                need = [i for i in range(center_frame - 2, center_frame + 3) if 0 <= i < self.frame_count]
+                half = num_thumbs // 2
+                need = [i for i in range(center_frame - half, center_frame + half + 1) if 0 <= i < self.frame_count]
             else:
                 need = [center_frame]
 
