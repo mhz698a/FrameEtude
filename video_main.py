@@ -8,6 +8,7 @@ from smb_dialog import SMBDialog
 from PIL import Image
 from config import *
 from utils import *
+from infoutils import get_overwrite_data
 from frame_player_panel import FramePlayerPanel
 from lyric_vision_panel import LyricVisionPanel
 from about_season_dialog import AboutSeasonDialog
@@ -61,6 +62,9 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_rescan = QtWidgets.QPushButton("Refresh")
         self.btn_rescan.clicked.connect(self.rescan_current_master_folder)
         
+        self.btn_settings = QtWidgets.QPushButton("Settings")
+        # self.btn_settings.clicked.connect(self.open_settings_dialog)
+        
         self.btn_open_folder = QtWidgets.QPushButton("Open")
         self.btn_open_folder.clicked.connect(self.open_folder_in_explorer)
         
@@ -82,8 +86,9 @@ class VideoEtude(QtWidgets.QMainWindow):
         
         h1_master.addWidget(self.combo_master, 1)
         h1_master.addWidget(self.btn_about)
+        h1_master.addWidget(self.btn_rescan)        
         
-        h2_master.addWidget(self.btn_rescan)
+        h2_master.addWidget(self.btn_settings)
         h2_master.addWidget(self.btn_open_folder)
         h2_master.addWidget(self.btn_etude)
         h2_master.addWidget(self.btn_ovreg1)
@@ -129,10 +134,10 @@ class VideoEtude(QtWidgets.QMainWindow):
         
         overwrite_btns = QtWidgets.QHBoxLayout()
         botones_config = [
-            ('Overwrite P', OVERWRITE_0),
-            ('Overwrite I', OVERWRITE_1),
-            ('Overwrite II', OVERWRITE_2),
-            ('Overwrite III', OVERWRITE_3)
+            ('Overwrite P', get_overwrite_data("ov_0")),
+            ('Overwrite I', get_overwrite_data("ov_1")),
+            ('Overwrite II', get_overwrite_data("ov_2")),
+            ('Overwrite III', get_overwrite_data("ov_3"))
         ]
 
         for texto, constante in botones_config:
@@ -961,7 +966,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         if not video_path:
             return
 
-        command = [RENAME_DIALOG_EXE, RENAME_DIALOG_SCRIPT, video_path]
+        command = ["pythonw", RENAME_DIALOG_SCRIPT, video_path]
 
         try:
             subprocess.Popen(command)
