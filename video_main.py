@@ -6,7 +6,7 @@ from cut_dialog_ex import CutDialog
 from file_table_widget import FileTableWidget
 from smb_dialog import SMBDialog
 from PIL import Image
-from config import *
+import config
 from utils import *
 from infoutils import get_overwrite_data
 from frame_player_panel import FramePlayerPanel
@@ -282,7 +282,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         if not year or year == '(no encontrado)':
             return
         
-        year_path = os.path.join(BASE_INTERNAL_ROOT, year)
+        year_path = os.path.join(config.BASE_INTERNAL_ROOT, year)
         
         # buscar carpeta que contenga '___[' en su nombre
         found = None
@@ -493,7 +493,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.worker = None
             self.worker_thread = None
 
-        self.worker = VideoWorker(cache_size=CACHE_SIZE)
+        self.worker = VideoWorker(cache_size=config.CACHE_SIZE)
         self.worker_thread = QtCore.QThread()
         self.worker.moveToThread(self.worker_thread)
         self.worker.frames_ready.connect(self.on_frames_ready)
@@ -524,13 +524,13 @@ class VideoEtude(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot(object)
     def on_frames_ready(self, frames_dict):
-        visible_indices = list(range(NUM_THUMBS)) if self.check_adjacent.isChecked() else [2]
+        visible_indices = list(range(config.NUM_THUMBS)) if self.check_adjacent.isChecked() else [2]
         for idx, arr in frames_dict.items():
             if not (0 <= idx < self.frame_count):
                 continue
             rel = idx - self.frame_actual
             label_index = 2 + rel
-            if label_index < 0 or label_index >= NUM_THUMBS:
+            if label_index < 0 or label_index >= config.NUM_THUMBS:
                 if idx == self.frame_actual:
                     label_index = 2
                 else:
@@ -561,10 +561,10 @@ class VideoEtude(QtWidgets.QMainWindow):
         avail = self.available_thumb_area_width()
         if visible_count <= 0:
             visible_count = 1
-        total_spacing = THUMB_SPACING * (visible_count - 1)
+        total_spacing = config.THUMB_SPACING * (visible_count - 1)
         w = (avail - total_spacing) / visible_count
-        w = int(max(MIN_THUMB_WIDTH, min(DEFAULT_THUMB_WIDTH, w)))
-        h = int(w * THUMB_ASPECT)
+        w = int(max(config.MIN_THUMB_WIDTH, min(config.DEFAULT_THUMB_WIDTH, w)))
+        h = int(w * config.THUMB_ASPECT)
         return w, h
 
     def clear_layout(self, layout):
@@ -575,7 +575,7 @@ class VideoEtude(QtWidgets.QMainWindow):
                 layout.removeWidget(widget)
 
     def rebuild_thumb_layout(self, apply_cached_sizes=False):
-        visible_indices = list(range(NUM_THUMBS)) if self.check_adjacent.isChecked() else [2]
+        visible_indices = list(range(config.NUM_THUMBS)) if self.check_adjacent.isChecked() else [2]
         visible_count = len(visible_indices)
         # clear current labels from layout
         while self.thumb_layout.count():
@@ -607,7 +607,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.request_current_frames()
 
     def update_curtain_geometry(self):
-        visible_count = NUM_THUMBS if self.check_adjacent.isChecked() else 1
+        visible_count = config.NUM_THUMBS if self.check_adjacent.isChecked() else 1
         thumb_w, thumb_h = self.compute_thumb_size_for(visible_count)
         w = max(self.thumb_container.width(), 10)
         self.curtain.set_geometry_height(0, 0, w, thumb_h)
@@ -622,8 +622,8 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.update_curtain_geometry()
         except Exception:
             if hasattr(self, 'curtain') and hasattr(self, 'thumb_container'):
-                vis_count = NUM_THUMBS if getattr(self, 'check_adjacent', None) and self.check_adjacent.isChecked() else 1
-                w, h = self.compute_thumb_size_for(vis_count) if hasattr(self, 'compute_thumb_size_for') else (MIN_THUMB_WIDTH, int(MIN_THUMB_WIDTH * THUMB_ASPECT))
+                vis_count = config.NUM_THUMBS if getattr(self, 'check_adjacent', None) and self.check_adjacent.isChecked() else 1
+                w, h = self.compute_thumb_size_for(vis_count) if hasattr(self, 'compute_thumb_size_for') else (config.MIN_THUMB_WIDTH, int(config.MIN_THUMB_WIDTH * config.THUMB_ASPECT))
                 self.curtain.set_geometry_height(0, 0, max(self.thumb_container.width(), 10), h)
                 if getattr(self, 'check_curtain', None) and self.check_curtain.isChecked():
                     self.curtain.show()
@@ -866,15 +866,15 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         # prepare params
         params = {
-            'scale': OCR_SCALE,
-            'clahe': OCR_USE_CLAHE,
-            'clahe_clip': OCR_CLAHE_CLIP,
-            'denoise_ksize': OCR_DENOISE_KSIZE,
-            'dilate_iter': OCR_DILATE_ITER,
-            'invert': OCR_INVERT,
-            'binarize': OCR_BINARIZE,
-            'psm': OCR_PSM,
-            'lang': OCR_LANG,
+            'scale': config.OCR_SCALE,
+            'clahe': config.OCR_USE_CLAHE,
+            'clahe_clip': config.OCR_CLAHE_CLIP,
+            'denoise_ksize': config.OCR_DENOISE_KSIZE,
+            'dilate_iter': config.OCR_DILATE_ITER,
+            'invert': config.OCR_INVERT,
+            'binarize': config.OCR_BINARIZE,
+            'psm': config.OCR_PSM,
+            'lang': config.OCR_LANG,
         }
 
         # run OCR in background
@@ -966,7 +966,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         if not video_path:
             return
 
-        command = ["pythonw", RENAME_DIALOG_SCRIPT, video_path]
+        command = ["pythonw", config.RENAME_DIALOG_SCRIPT, video_path]
 
         try:
             subprocess.Popen(command)
