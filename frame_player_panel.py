@@ -3,7 +3,7 @@ from PyQt6 import QtCore, QtWidgets
 
 from curtain_lib import CurtainOverlay
 from ocr_lib import SelectionOverlay
-from config import NUM_THUMBS, THUMB_SPACING
+import config
 
 
 class FramePlayerPanel(QtWidgets.QWidget):
@@ -26,7 +26,7 @@ class FramePlayerPanel(QtWidgets.QWidget):
         main.thumb_container = QtWidgets.QWidget()
         main.thumb_layout = QtWidgets.QHBoxLayout(main.thumb_container)
         main.thumb_layout.setContentsMargins(0, 0, 0, 0)
-        main.thumb_layout.setSpacing(THUMB_SPACING)
+        main.thumb_layout.setSpacing(config.THUMB_SPACING)
         main.thumb_container.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Fixed,
@@ -34,7 +34,7 @@ class FramePlayerPanel(QtWidgets.QWidget):
         layout.addWidget(main.thumb_container)
 
         main.thumb_labels = []
-        for _ in range(NUM_THUMBS):
+        for _ in range(config.NUM_THUMBS):
             lbl = QtWidgets.QLabel()
             lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             lbl.setStyleSheet("background-color: rgb(18,18,18); border: 1px solid #2b2b2b;")

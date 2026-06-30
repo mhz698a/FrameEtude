@@ -1,5 +1,5 @@
 import collections, cv2
-from config import *
+import config
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 # -----------------------
@@ -10,7 +10,7 @@ class VideoWorker(QtCore.QObject):
     opened = QtCore.pyqtSignal(float, int)
     error = QtCore.pyqtSignal(str)
 
-    def __init__(self, cache_size=CACHE_SIZE, parent=None):
+    def __init__(self, cache_size=config.CACHE_SIZE, parent=None):
         super().__init__(parent)
         self.cap = None
         self.path = None
@@ -62,6 +62,7 @@ class VideoWorker(QtCore.QObject):
             self.cache.move_to_end(idx)
             return
         self.cache[idx] = rgb_array
+        # Use current self.cache_size which might have been updated
         while len(self.cache) > self.cache_size:
             self.cache.popitem(last=False)
 
@@ -101,7 +102,8 @@ class VideoWorker(QtCore.QObject):
                 return
             center_frame = max(0, min(center_frame, self.frame_count - 1))
             if show_adjacent:
-                need = [i for i in range(center_frame - 2, center_frame + 3) if 0 <= i < self.frame_count]
+                half = config.NUM_THUMBS // 2
+                need = [i for i in range(center_frame - half, center_frame - half + config.NUM_THUMBS) if 0 <= i < self.frame_count]
             else:
                 need = [center_frame]
 
