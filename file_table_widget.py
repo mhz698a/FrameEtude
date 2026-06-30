@@ -3,7 +3,7 @@ import functools
 from ctypes import wintypes, windll
 from typing import Any
 from PyQt6 import QtCore, QtGui, QtWidgets
-from config import RENAME_DIALOG_EXE, RENAME_DIALOG_SCRIPT
+from config import RENAME_DIALOG_SCRIPT
 from duration_async_lib import DurationFetchJob, DurationFetchThread
 from metadata_async_lib import MetadataSaveJob, MetadataSaveThread
 from metadata_edit_lib import (
@@ -1109,7 +1109,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         if not path:
             return
 
-        command = [RENAME_DIALOG_EXE, RENAME_DIALOG_SCRIPT, path]
+        command = ["pythonw", RENAME_DIALOG_SCRIPT, path]
 
         try:
             subprocess.Popen(command)
