@@ -1,6 +1,7 @@
 import os, re, struct, datetime, cv2, win32clipboard, subprocess, sys
 from PyQt6 import QtCore, QtGui, QtWidgets
 from ocr_lib import OCRWorker
+from settings_dialog import SettingsDialog
 from vidwk_lib import VideoWorker
 from cut_dialog_ex import CutDialog
 from file_table_widget import FileTableWidget
@@ -63,7 +64,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_rescan.clicked.connect(self.rescan_current_master_folder)
         
         self.btn_settings = QtWidgets.QPushButton("Settings")
-        # self.btn_settings.clicked.connect(self.open_settings_dialog)
+        self.btn_settings.clicked.connect(self.open_settings_dialog)
         
         self.btn_open_folder = QtWidgets.QPushButton("Open")
         self.btn_open_folder.clicked.connect(self.open_folder_in_explorer)
@@ -1174,3 +1175,36 @@ class VideoEtude(QtWidgets.QMainWindow):
         
         self.file_table.setCurrentCell(prev_row, 0)
         self.load_current_lyric_entry()
+    
+    def open_settings_dialog(self):
+        dlg = SettingsDialog(self)
+        if dlg.exec():
+            # Update thumb labels list if NUM_THUMBS changed
+            if len(self.thumb_labels) != config.NUM_THUMBS:
+                # Remove old labels
+                for lbl in self.thumb_labels:
+                    lbl.setParent(None)
+                    lbl.deleteLater()
+                self.thumb_labels.clear()
+
+                # Create new labels
+                for _ in range(config.NUM_THUMBS):
+                    lbl = QtWidgets.QLabel()
+                    lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+                    lbl.setStyleSheet("background-color: rgb(18,18,18); border: 1px solid #2b2b2b;")
+                    lbl.setSizePolicy(
+                        QtWidgets.QSizePolicy.Policy.Fixed,
+                        QtWidgets.QSizePolicy.Policy.Fixed,
+                    )
+                    self.thumb_labels.append(lbl)
+            
+            # Update spacing
+            self.thumb_layout.setSpacing(config.THUMB_SPACING)
+
+            # Update worker cache size
+            if self.worker:
+                self.worker.cache_size = config.CACHE_SIZE
+
+            # Apply immediate UI updates
+            self.rebuild_thumb_layout()
+            self.update_thumbs_visibility()

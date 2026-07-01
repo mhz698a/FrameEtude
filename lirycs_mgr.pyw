@@ -12,9 +12,9 @@ from PyQt6.QtGui import (
     QPalette, QColor
 )
 from PyQt6.QtCore import Qt
-from config import ID_APP_LIRYCS, ICON_PATH_LIRYCS
+import config
 
-ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(ID_APP_LIRYCS)
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(config.ID_APP_LIRYCS)
 
 
 class LirycsBook(QMainWindow):
@@ -23,8 +23,8 @@ class LirycsBook(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        if os.path.exists(ICON_PATH_LIRYCS):
-            self.setWindowIcon(QIcon(ICON_PATH_LIRYCS))
+        if os.path.exists(config.ICON_PATH_LIRYCS):
+            self.setWindowIcon(QIcon(config.ICON_PATH_LIRYCS))
 
         self.setWindowTitle("LyricsBook")
         self.resize(1200, 600)
