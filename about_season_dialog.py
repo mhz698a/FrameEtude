@@ -1,16 +1,10 @@
 import json
 import os
-
+import config
 from PyQt6 import QtCore, QtWidgets
 
-
-def _repo_root() -> str:
-    return os.path.dirname(os.path.abspath(__file__))
-
-
 def _seasons_path() -> str:
-    return os.path.join(_repo_root(), "seasons.json")
-
+    return config.SEASON_DATABASE
 
 def load_seasons_for_year(year: str) -> list[dict]:
     year = str(year).strip()

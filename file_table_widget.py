@@ -193,8 +193,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
             for idx, row_data in enumerate(rows, start=1):
                 self._append_row_data(row_data)
                 self.row_count_changed.emit(idx)
-                QtWidgets.QApplication.processEvents()
-
+                QtWidgets.QApplication.processEvents()  
+                          
             self._save_header_state()
             self._sync_scrollbars()
             self.row_count_changed.emit(len(rows))
@@ -207,7 +207,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 [e for e in os.scandir(self._current_folder) if e.is_file()],
                 key=lambda e: windows_sort_key()(e.name),
             )
-
+            
             for entry in entries:
                 if not entry.is_file():
                     continue
@@ -346,7 +346,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 used.add(number)
 
         return used
-
+        
     def _set_track_number(self, row: int, number: int, total: int | None = None) -> None:
         total = total if total is not None and total > 0 else self.rowCount()
         track_col = self._track_column_index()
@@ -511,13 +511,13 @@ class FileTableWidget(QtWidgets.QTableWidget):
     def _run_metadata_jobs(self, jobs: list[MetadataSaveJob]) -> None:
         if not jobs:
             return
-
+        
         slow_jobs = [job for job in jobs if job.path]
         if slow_jobs and self.progress_label is not None:
             self.progress_label.setText(
                 f"Preparando... {len(slow_jobs)} archivo(s)"
             )
-
+        
         thread = MetadataSaveThread(jobs, self)
         thread.job_started.connect(self._on_metadata_job_started)
         thread.progress.connect(self._on_metadata_progress)
@@ -533,7 +533,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
             len(jobs),
             jobs[0].path,
             False,
-        )
+        )        
         thread.finished.connect(thread.deleteLater)
 
         if not hasattr(self, "_metadata_threads"):
@@ -563,7 +563,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
             return
 
         ts_kind = "ctime" if target_key == "real_ctime" else "mtime"
-
+        
         jobs: list[MetadataSaveJob] = []
         foreign_entries: list[tuple[str, str]] = []
         collecting_all = False
@@ -739,7 +739,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
                                 path: str, moov_front: bool,):
         self._moov_front_cache = getattr(self, "_moov_front_cache", {})
         self._moov_front_cache[path] = moov_front
-
+        
         if self.progress_bar is not None:
             self.progress_bar.setMaximum(total)
             self.progress_bar.setValue(max(0, current - 1))
@@ -863,7 +863,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         if not jobs:
             return
-
+        
         if not self._show_foreign_comment_summary(foreign_entries):
             return
 
@@ -877,7 +877,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 if ok else None
             )
         )
-
+        
         self._on_metadata_job_started(
             1,
             len(jobs),
@@ -908,7 +908,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         if self.progress_label is not None:
             filename = os.path.basename(path)
             moov_front = getattr(self, "_moov_front_cache", {}).get(path, True)
-            note = "" if moov_front else "no moov;"
+            note = "" if moov_front else "no moov;" 
             self.progress_label.setText(f"{note} {current}/{total} - {filename}")
 
         if current >= total and total > 0:
@@ -939,7 +939,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         cell = index.isValid()
 
-        menu = QtWidgets.QMenu(self)
+        menu = QtWidgets.QMenu(self)                
         menu.setStyleSheet("""
             QMenu::item {
                 padding: 4px 20px;
@@ -957,10 +957,10 @@ class FileTableWidget(QtWidgets.QTableWidget):
         if cell:
             index = self.indexAt(pos)
             if index.isValid():
-
+                
                 logical_col = index.column()
                 logical_key = self.COLUMNS[logical_col][1]
-
+                
                 header_text = (
                     self.horizontalHeaderItem(logical_col).text()
                     if self.horizontalHeaderItem(logical_col)
@@ -968,7 +968,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 )
 
                 self.setCurrentCell(index.row(), index.column())
-
+                
                 if logical_col != 0:
                     menu.addAction("Editar esta celda", self.edit_current_cell)
                     menu.addAction("Pegar datos desde esta celda", self.paste_from_current_cell)
@@ -994,15 +994,15 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 header_action.triggered.connect(
                     lambda _=False, t=header_text: self.copy_to_clipboard(t)
                 )
-
+                
                 if logical_key in ("album", "artist"):
                     menu.addSeparator()
                     self._add_season_context_menu(menu, index.row(), logical_col)
-
+                                    
                 if logical_key == "track":
                     menu.addSeparator()
                     self._add_track_context_menu(menu, index.row())
-
+                                    
 
                 if logical_key == "real_ctime":
                     menu.addSeparator()
@@ -1011,8 +1011,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
                         lambda: self._save_filesystem_times_from_column("real_ctime")
                     )
                     self._add_real_timestamp_single_context_menu(menu, index.row(), logical_col)
-
-
+                
+                
                 if logical_key == "real_mtime":
                     menu.addSeparator()
                     menu.addAction(
@@ -1020,7 +1020,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
                         lambda: self._save_filesystem_times_from_column("real_mtime")
                     )
                     self._add_real_timestamp_single_context_menu(menu, index.row(), logical_col)
-
+                                
 
                 if logical_key == "genre":
                     menu.addSeparator()
@@ -1031,9 +1031,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
                             genre_value,
                             lambda checked=False, value=genre_value: self.fill_genre_column_with_value(value),
                         )
-
+                        
                     self._add_genre_single_context_menu(menu, index.row(), logical_col)
-
+                        
                 if logical_key == "release_date":
                     menu.addSeparator()
                     release_menu = menu.addMenu("Obtener fechas del filename")
@@ -1045,7 +1045,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
                         "Asignar a toda esta columna",
                         self._save_release_dates_from_filenames,
                     )
-
+                    
                 if logical_key == "disk":
                     menu.addSeparator()
                     disk_menu = menu.addMenu("Agregar numero de disco/temporada")
@@ -1059,8 +1059,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
                         "Aplicar en toda la columna",
                         lambda col=logical_col: self._apply_disk_season_to_column(col),
                     )
-
-                menu.addSeparator()
+                    
+                menu.addSeparator()                
                 menu.addAction(
                     "Copiar columna completa",
                     lambda col=logical_col: self.copy_column(col, include_header=True)
@@ -1069,7 +1069,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
                     "Copiar columna sin encabezado",
                     lambda col=logical_col: self.copy_column(col, include_header=False)
                 )
-
+                
                 menu.addSeparator()
                 menu.addAction(
                     "Ajustar esta columna al contenido",
@@ -1079,13 +1079,13 @@ class FileTableWidget(QtWidgets.QTableWidget):
                     "Ajustar todas las columnas al contenido",
                     self.resize_all_columns_to_content
                 )
-
+                
                 menu.addSeparator()
                 menu.addAction(
                     "Copiar tabla con encabezados",
                     lambda: self.copy_all(True)
                 )
-
+                
                 menu.addSeparator()
                 menu.addAction("Copiar Ruta de este archivo", self.copy_current_file_path)
                 menu.addAction("Abrir este archivo con rename dialog", self.open_current_file_with_rename_dialog)
@@ -1189,7 +1189,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         value = QtWidgets.QApplication.clipboard().text()
         if not value.strip():
             return
-
+        
         reply = QtWidgets.QMessageBox.warning(
             self,
             "Advertencia",
@@ -1197,7 +1197,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
             QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
             QtWidgets.QMessageBox.StandardButton.No
         )
-
+        
         if reply != QtWidgets.QMessageBox.StandardButton.Yes:
             return
 
@@ -1229,13 +1229,13 @@ class FileTableWidget(QtWidgets.QTableWidget):
                     replace_foreign_comments=replace_foreign,
                 )
             )
-
+            
         if not self._show_foreign_comment_summary(foreign_entries):
             return
 
         if jobs:
             self._run_metadata_jobs(jobs)
-
+            
     def fill_column_from_input(self, column: int):
         if column <= 0 or column >= self.columnCount():
             return
@@ -1245,11 +1245,11 @@ class FileTableWidget(QtWidgets.QTableWidget):
             return
 
         value, ok = QtWidgets.QInputDialog.getText(
-            self,
-            "Introducir valor",
+            self, 
+            "Introducir valor", 
             f"Ingrese el nuevo valor para rellenar esta columna '{key}':"
         )
-
+        
         if not ok or not value.strip():
             return
 
@@ -1288,7 +1288,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         key = self.COLUMNS[column][1]
         if key == "duration":
             return
-
+        
         reply = QtWidgets.QMessageBox.warning(
             self,
             "Advertencia de borrado",
@@ -1296,12 +1296,12 @@ class FileTableWidget(QtWidgets.QTableWidget):
             QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
             QtWidgets.QMessageBox.StandardButton.No
         )
-
+        
         if reply != QtWidgets.QMessageBox.StandardButton.Yes:
             return
-
+        
         value = ''
-
+        
         jobs = []
 
         for row in range(self.rowCount()):
@@ -1430,7 +1430,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         if jobs:
             self._run_metadata_jobs(jobs)
-
+            
     def _selected_year_px(self) -> str:
         window = self.window()
         combo_year = getattr(window, "combo_year", None)
@@ -1443,7 +1443,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
             return f"{int(year) - 2003:02d}"
         except ValueError:
             return ""
-
+        
     def _selected_year_full(self) -> str:
         window = self.window()
         combo_year = getattr(window, "combo_year", None)
@@ -1500,7 +1500,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         if jobs:
             self._run_metadata_jobs(jobs)
-
+    
     def set_overwrite_1_hidden(self, hidden: bool) -> None:
         for column, (_, key) in enumerate(self.COLUMNS):
             if key == "overwrite_1_times":
