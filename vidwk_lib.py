@@ -1,6 +1,6 @@
 import collections, cv2
-from config import *
 from PyQt6 import QtCore, QtGui, QtWidgets
+import config
 
 # -----------------------
 # Worker: ejecuta en su propio QThread y gestiona cv2.VideoCapture + cache + lectura secuencial
@@ -10,7 +10,7 @@ class VideoWorker(QtCore.QObject):
     opened = QtCore.pyqtSignal(float, int)
     error = QtCore.pyqtSignal(str)
 
-    def __init__(self, cache_size=CACHE_SIZE, parent=None):
+    def __init__(self, cache_size=config.CACHE_SIZE, parent=None):
         super().__init__(parent)
         self.cap = None
         self.path = None
@@ -167,5 +167,3 @@ class VideoWorker(QtCore.QObject):
                             result[target] = v
 
             self.frames_ready.emit(result)
-
-#

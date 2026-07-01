@@ -1,5 +1,5 @@
 import json
-from config import OVERWRITE_DATABASE
+import config
 
 def get_overwrite_data(key_const):
     """
@@ -9,7 +9,7 @@ def get_overwrite_data(key_const):
     * regresa: (time_num, review_date, info)
     """
     
-    with open(OVERWRITE_DATABASE, "r", encoding="utf-8") as archivo:
+    with open(config.OVERWRITE_DATABASE, "r", encoding="utf-8") as archivo:
         datos = json.load(archivo)
 
     item = datos[key_const]
