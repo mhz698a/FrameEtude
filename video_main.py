@@ -135,15 +135,15 @@ class VideoEtude(QtWidgets.QMainWindow):
         
         overwrite_btns = QtWidgets.QHBoxLayout()
         botones_config = [
-            ('Overwrite P', get_overwrite_data("ov_0")),
-            ('Overwrite I', get_overwrite_data("ov_1")),
-            ('Overwrite II', get_overwrite_data("ov_2")),
-            ('Overwrite III', get_overwrite_data("ov_3"))
+            ('Overwrite P', "ov_0"),
+            ('Overwrite I', "ov_1"),
+            ('Overwrite II', "ov_2"),
+            ('Overwrite III', "ov_3")
         ]
 
-        for texto, constante in botones_config:
+        for texto, key in botones_config:
             btn = QtWidgets.QPushButton(texto)
-            btn.clicked.connect(lambda checked, c=constante: self.showOverwriteInfo(c))
+            btn.clicked.connect(lambda checked, k=key: self.showOverwriteInfo(k))
             overwrite_btns.addWidget(btn)
 
         left_layout.addLayout(overwrite_btns)
@@ -219,7 +219,8 @@ class VideoEtude(QtWidgets.QMainWindow):
         except Exception:
             pass
 
-    def showOverwriteInfo(self, times_num: tuple):
+    def showOverwriteInfo(self, key: str):
+        times_num = get_overwrite_data(key)
         QtWidgets.QMessageBox.information(
             self, f"Overwrite {times_num[0]} Review: {times_num[1]}", times_num[2]
         )
