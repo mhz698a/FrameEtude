@@ -34,8 +34,8 @@ DEFAULT_OCR_PARAMETERS = {
 
 DEFAULT_SETTINGS = {
     "RENAME_DIALOG_SCRIPT": r"C:\Users\miche\OneDrive\foobar2000\profile\ActivityBar\rename_dialog.py",
-    "OVERWRITE_DATABASE": f"{APP_DIR}/overwrite.json",
-    "SEASON_DATABASE": f"{APP_DIR}/seasons.json",
+    "OVERWRITE_DATABASE": "",
+    "SEASON_DATABASE": "",
     "BASE_INTERNAL_ROOT": r"E:\_Internal",
     "DEFAULT_THUMB_WIDTH": 700,
     "MIN_THUMB_WIDTH": 120,
