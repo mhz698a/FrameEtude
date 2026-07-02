@@ -181,8 +181,4 @@ Este proyecto no tiene licencia especificada. Ver detalles en el repositorio.
 
 **Última actualización**: Julio 2026  
 **Estado**: En desarrollo activo
-```
-
-✅ **Formatos soportados**  
-
-Puedo hacer que lo cargue directamente al repositorio si lo deseas. ¿Necesitas algún ajuste?
+**Tipo de proyecto**: Prototipo
