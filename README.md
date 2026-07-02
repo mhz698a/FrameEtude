@@ -182,3 +182,6 @@ Este proyecto no tiene licencia especificada. Ver detalles en el repositorio.
 **Última actualización**: Julio 2026  
 **Estado**: En desarrollo activo
 **Tipo de proyecto**: Prototipo
+**NOTA CRITICA**: Este es un proyecto personal de automatización diseñado específicamente para ejecutarse en entornos locales parametrizados.
+
+
