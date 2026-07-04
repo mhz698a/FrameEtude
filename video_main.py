@@ -14,10 +14,8 @@ from frame_player_panel import FramePlayerPanel
 from lyric_vision_panel import LyricVisionPanel
 from about_season_dialog import AboutSeasonDialog
 from year_selector_bar import YearSelectorBar
+from folder_selector_bar import FolderSelectorBar
 
-# -----------------------
-# UI: VideoEtude main window
-# -----------------------
 class VideoEtude(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -26,7 +24,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         screen_w = screen.width()
         screen_h = screen.height()
         self.setMaximumSize(screen_w, screen_h)
-        self.resize(1200, 620)
+        self.resize(1300, 620)
 
         # central layout: left panel + right main area
         w = QtWidgets.QWidget()
@@ -37,12 +35,11 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         # ---------------- Left panel ----------------
         self.left_panel = QtWidgets.QWidget()
-        self.left_panel.setFixedWidth(550)
+        self.left_panel.setFixedWidth(660)
         left_layout = QtWidgets.QVBoxLayout(self.left_panel)
         left_layout.setContentsMargins(4,4,4,4)
         left_layout.setSpacing(6)
         
-        left_layout.addWidget(QtWidgets.QLabel('<b>E:\\_Internal\\...\\___[...]\\...\\...</b>'))
         h1_master = QtWidgets.QHBoxLayout()
         
         self.combo_year = QtWidgets.QComboBox()
@@ -53,9 +50,14 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.year_selector_bar = YearSelectorBar()
         self.year_selector_bar.yearSelected.connect(self.on_year_bar_selected)
         
+        self.folder_selector_bar = FolderSelectorBar()
+        self.folder_selector_bar.folderSelected.connect(self.on_master_changed)
+        self.folder_selector_bar.folderChanged.connect(
+            lambda: self.on_year_changed(self.combo_year.currentIndex())
+            )
+        
         h2_master = QtWidgets.QHBoxLayout()
-        self.combo_master = QtWidgets.QComboBox()
-        self.combo_master.currentIndexChanged.connect(self.on_master_changed)
+        self.base_label = QtWidgets.QLabel('<b>E:\\_Internal\\...\\___[...]\\...\\...</b>')
         
         self.btn_about = QtWidgets.QPushButton("About")
         self.btn_about.clicked.connect(self.open_about_dialog)
@@ -65,10 +67,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         
         self.btn_settings = QtWidgets.QPushButton("Settings")
         self.btn_settings.clicked.connect(self.open_settings_dialog)
-        
-        self.btn_open_folder = QtWidgets.QPushButton("Open")
-        self.btn_open_folder.clicked.connect(self.open_folder_in_explorer)
-        
+                
         self.btn_etude = QtWidgets.QPushButton("Etude")
         self.btn_etude.clicked.connect(self.open_etude_file)
         
@@ -85,12 +84,11 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_check.clicked.connect(self.open_lyrics_manager)
         self.btn_check.hide()
         
-        h1_master.addWidget(self.combo_master, 1)
+        h1_master.addWidget(self.base_label, 1)
         h1_master.addWidget(self.btn_about)
-        h1_master.addWidget(self.btn_rescan)        
+        h1_master.addWidget(self.btn_rescan)
         
         h2_master.addWidget(self.btn_settings)
-        h2_master.addWidget(self.btn_open_folder)
         h2_master.addWidget(self.btn_etude)
         h2_master.addWidget(self.btn_ovreg1)
         h2_master.addWidget(self.btn_ovreg2)        
@@ -116,7 +114,9 @@ class VideoEtude(QtWidgets.QMainWindow):
         
         files_row = QtWidgets.QHBoxLayout()
         files_row.setSpacing(6)
+        
         files_row.addWidget(self.year_selector_bar)
+        files_row.addWidget(self.folder_selector_bar)
         files_row.addWidget(self.file_table, 1)
         left_layout.addLayout(files_row, 1)
         
@@ -278,7 +278,7 @@ class VideoEtude(QtWidgets.QMainWindow):
     def on_year_changed(self, idx):
         self.exit_lyric_mode(uncheck=True)
         self.chk_lyric.hide()
-        self.combo_master.clear()
+        self.folder_selector_bar.set_folders([])
         self.btn_check.hide()
         year = self.combo_year.currentText()
         if not year or year == '(no encontrado)':
@@ -296,8 +296,8 @@ class VideoEtude(QtWidgets.QMainWindow):
                     break
         except Exception:
             found = None
+        
         if not found:
-            self.combo_master.addItem('(no encontrado)')
             return
         
         try:
@@ -309,19 +309,17 @@ class VideoEtude(QtWidgets.QMainWindow):
         
         # listar subcarpetas de found
         try:
-            subs = [d for d in os.listdir(found) if os.path.isdir(os.path.join(found, d))]
-            subs_sorted = sorted(subs)
-            for s in subs_sorted:
-                self.combo_master.addItem(os.path.join(found, s))
+            subs = [os.path.join(found, d) for d in os.listdir(found) if os.path.isdir(os.path.join(found, d))]
+            subs_sorted = sorted(subs, key=lambda x: os.path.basename(x))
+            self.folder_selector_bar.set_folders(subs_sorted)
+            if subs_sorted:
+                self.folder_selector_bar.setCurrentRow(0)
         except Exception:
-            self.combo_master.addItem('(no encontrado)')
+            pass
 
-
-
-    def on_master_changed(self, idx):
+    def on_master_changed(self, path: str):
         self.exit_lyric_mode(uncheck=True)
 
-        path = self.combo_master.currentText()
         self.update_lyrics_check_button_visibility()
 
         if not path or path == '(no encontrado)':
@@ -339,7 +337,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         self._sync_lyric_checkbox_for_folder(base)
 
     def rescan_current_master_folder(self):
-        path = self.combo_master.currentText()
+        path = self.folder_selector_bar.current_folder_path()
         if not path or path == '(no encontrado)':
             return
 
@@ -348,11 +346,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             base = os.path.dirname(path)
 
         self.file_table.invalidate_folder(base)
-        self.on_master_changed(self.combo_master.currentIndex())
-
-    def open_folder_in_explorer(self):
-        path = self.combo_master.currentText()
-        os.startfile(path)
+        self.on_master_changed(path)
 
     def open_etude_file(self):
         year = self.combo_year.currentText()
@@ -361,7 +355,7 @@ class VideoEtude(QtWidgets.QMainWindow):
 
 
     def get_reg_ov_temp(self, ov_ver: str):
-        py_execute = sys.executable  
+        py_execute = sys.executable
         cur_fr_script = os.path.dirname(os.path.abspath(__file__))
         child_script = os.path.join(cur_fr_script, "temp_ov_dtrng.pyw")
         year = self.combo_year.currentText()
@@ -390,7 +384,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.information(self, "About", "No hay un año válido seleccionado.")
             return
 
-        master_path = self.combo_master.currentText().strip()
+        master_path = self.folder_selector_bar.current_folder_path().strip()
         master_folder_name = ""
         if master_path and master_path != "(no encontrado)":
             master_folder_name = os.path.basename(master_path)
@@ -1014,13 +1008,13 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.centralWidget().updateGeometry()
 
     def update_lyrics_check_button_visibility(self):
-        path = self.combo_master.currentText().strip()
+        path = self.folder_selector_bar.current_folder_path().strip()
         base = path if os.path.isdir(path) else os.path.dirname(path)
         show = bool(base and os.path.basename(base.rstrip("\\/")).lower().endswith("lyrics"))
         self.btn_check.setVisible(show)
 
     def open_lyrics_manager(self):
-        path = self.combo_master.currentText().strip()
+        path = self.folder_selector_bar.current_folder_path().strip()
         if not path or path == '(no encontrado)':
             return
 
@@ -1059,7 +1053,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.folder_count_label.setText(f"{count} archivos multimedia detectados en esta carpeta")
 
     def _current_master_folder(self) -> str:
-        path = self.combo_master.currentText().strip()
+        path = self.folder_selector_bar.current_folder_path().strip()
         if not path or path == '(no encontrado)':
             return ""
         return path if os.path.isdir(path) else os.path.dirname(path)
