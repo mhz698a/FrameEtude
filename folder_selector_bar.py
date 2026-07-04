@@ -8,11 +8,11 @@ class FolderSelectorBar(QtWidgets.QListWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedWidth(180)
+        self.setFixedWidth(110)
         self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.itemSelectionChanged.connect(self._emit_selection)
-
+        
         self.setStyleSheet("""
             QListWidget {
                 background-color: #121212;
@@ -56,31 +56,28 @@ class FolderSelectorBar(QtWidgets.QListWidget):
     def show_context_menu(self, pos: QtCore.QPoint):
         item = self.itemAt(pos)
         menu = QtWidgets.QMenu(self)
-
+        
         # We need at least one folder in the list to have a parent directory to create a new folder in,
-        # or we need to know the base path.
+        # or we need to know the base path. 
         # Usually, this list is populated within a year's "found" path.
-
+        
         create_action = menu.addAction("Crear una nueva carpeta aqui")
         create_action.triggered.connect(lambda: self._create_folder(item))
-
+        
         if item:
             path = item.data(QtCore.Qt.ItemDataRole.UserRole)
-
-            refresh_action = menu.addAction("Actualizar esta carpeta")
-            refresh_action.triggered.connect(lambda: self.folderSelected.emit(path))
-
+            
             rename_action = menu.addAction("Renombrar esta carpeta")
             rename_action.triggered.connect(lambda: self._rename_folder(item))
-
+            
             delete_action = menu.addAction("Eliminar esta carpeta")
             is_empty = self._is_folder_empty_for_delete(path)
             delete_action.setEnabled(is_empty)
             delete_action.triggered.connect(lambda: self._delete_folder(item))
-
+            
             open_action = menu.addAction("Abrir esta carpeta en el explorador")
             open_action.triggered.connect(lambda: os.startfile(path))
-
+            
         menu.exec(self.mapToGlobal(pos))
 
     def _is_folder_empty_for_delete(self, path: str) -> bool:
@@ -103,7 +100,7 @@ class FolderSelectorBar(QtWidgets.QListWidget):
             base_dir = os.path.dirname(item.data(QtCore.Qt.ItemDataRole.UserRole))
         elif self.count() > 0:
             base_dir = os.path.dirname(self.item(0).data(QtCore.Qt.ItemDataRole.UserRole))
-
+        
         if not base_dir:
             return
 
@@ -120,7 +117,7 @@ class FolderSelectorBar(QtWidgets.QListWidget):
         old_path = item.data(QtCore.Qt.ItemDataRole.UserRole)
         old_name = os.path.basename(old_path)
         base_dir = os.path.dirname(old_path)
-
+        
         new_name, ok = QtWidgets.QInputDialog.getText(self, "Renombrar Carpeta", "Nuevo nombre:", text=old_name)
         if ok and new_name and new_name != old_name:
             new_path = os.path.join(base_dir, new_name)
@@ -133,15 +130,15 @@ class FolderSelectorBar(QtWidgets.QListWidget):
     def _delete_folder(self, item):
         path = item.data(QtCore.Qt.ItemDataRole.UserRole)
         confirm = QtWidgets.QMessageBox.question(
-            self, "Eliminar Carpeta",
+            self, "Eliminar Carpeta", 
             f"¿Estás seguro de que deseas eliminar la carpeta '{os.path.basename(path)}'?",
             QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
         )
         if confirm == QtWidgets.QMessageBox.StandardButton.Yes:
             try:
-                # Since we checked it's "empty" (only desktop.ini/thumbs.db),
+                # Since we checked it's "empty" (only desktop.ini/thumbs.db), 
                 # we can use shutil.rmtree or just os.rmdir if we delete those files first.
-                # User said "eliminar esta carpeta (desabilitar si no esta vacia)",
+                # User said "eliminar esta carpeta (desabilitar si no esta vacia)", 
                 # usually this implies it might have those excluded files.
                 shutil.rmtree(path)
                 self.folderChanged.emit()

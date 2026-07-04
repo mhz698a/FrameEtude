@@ -16,9 +16,6 @@ from about_season_dialog import AboutSeasonDialog
 from year_selector_bar import YearSelectorBar
 from folder_selector_bar import FolderSelectorBar
 
-# -----------------------
-# UI: VideoEtude main window
-# -----------------------
 class VideoEtude(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -27,7 +24,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         screen_w = screen.width()
         screen_h = screen.height()
         self.setMaximumSize(screen_w, screen_h)
-        self.resize(1200, 620)
+        self.resize(1300, 620)
 
         # central layout: left panel + right main area
         w = QtWidgets.QWidget()
@@ -38,81 +35,91 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         # ---------------- Left panel ----------------
         self.left_panel = QtWidgets.QWidget()
-        self.left_panel.setFixedWidth(550)
+        self.left_panel.setFixedWidth(660)
         left_layout = QtWidgets.QVBoxLayout(self.left_panel)
         left_layout.setContentsMargins(4,4,4,4)
         left_layout.setSpacing(6)
-
-        left_layout.addWidget(QtWidgets.QLabel('<b>E:\\_Internal\\...\\___[...]\\...\\...</b>'))
+        
         h1_master = QtWidgets.QHBoxLayout()
-
+        
         self.combo_year = QtWidgets.QComboBox()
         self.combo_year.setFixedWidth(60)
         self.combo_year.currentIndexChanged.connect(self.on_year_changed)
         self.combo_year.setVisible(False)
-
+        
         self.year_selector_bar = YearSelectorBar()
         self.year_selector_bar.yearSelected.connect(self.on_year_bar_selected)
-
+        
         self.folder_selector_bar = FolderSelectorBar()
         self.folder_selector_bar.folderSelected.connect(self.on_master_changed)
-        self.folder_selector_bar.folderChanged.connect(lambda: self.on_year_changed(self.combo_year.currentIndex()))
-
-        h1_master = QtWidgets.QHBoxLayout()
-
+        self.folder_selector_bar.folderChanged.connect(
+            lambda: self.on_year_changed(self.combo_year.currentIndex())
+            )
+        
+        h2_master = QtWidgets.QHBoxLayout()
+        self.base_label = QtWidgets.QLabel('<b>E:\\_Internal\\...\\___[...]\\...\\...</b>')
+        
         self.btn_about = QtWidgets.QPushButton("About")
         self.btn_about.clicked.connect(self.open_about_dialog)
-
+        
+        self.btn_rescan = QtWidgets.QPushButton("Refresh")
+        self.btn_rescan.clicked.connect(self.rescan_current_master_folder)
+        
         self.btn_settings = QtWidgets.QPushButton("Settings")
         self.btn_settings.clicked.connect(self.open_settings_dialog)
-
+                
         self.btn_etude = QtWidgets.QPushButton("Etude")
         self.btn_etude.clicked.connect(self.open_etude_file)
-
+        
         self.btn_ovreg1 = QtWidgets.QPushButton("Get Ov1 Reg")
         self.btn_ovreg1.clicked.connect(lambda: self.get_reg_ov_temp("1"))
-
+        
         self.btn_ovreg2 = QtWidgets.QPushButton("Get Ov2 Reg")
         self.btn_ovreg2.clicked.connect(lambda: self.get_reg_ov_temp("2"))
-
+        
         self.btn_eptmp = QtWidgets.QPushButton("Get Titles Ep")
         self.btn_eptmp.clicked.connect(self.get_episode_titles_temp)
-
+        
         self.btn_check = QtWidgets.QPushButton("Check")
         self.btn_check.clicked.connect(self.open_lyrics_manager)
         self.btn_check.hide()
-
+        
+        h1_master.addWidget(self.base_label, 1)
         h1_master.addWidget(self.btn_about)
-        h1_master.addWidget(self.btn_settings)
-        h1_master.addWidget(self.btn_etude)
-        h1_master.addWidget(self.btn_ovreg1)
-        h1_master.addWidget(self.btn_ovreg2)
-        h1_master.addWidget(self.btn_eptmp)
-        h1_master.addWidget(self.btn_check)
-
+        h1_master.addWidget(self.btn_rescan)
+        
+        h2_master.addWidget(self.btn_settings)
+        h2_master.addWidget(self.btn_etude)
+        h2_master.addWidget(self.btn_ovreg1)
+        h2_master.addWidget(self.btn_ovreg2)        
+        h2_master.addWidget(self.btn_eptmp)
+        h2_master.addWidget(self.btn_check)
+        
         left_layout.addLayout(h1_master)
-
+        left_layout.addLayout(h2_master)
+        
         self.folder_count_label = QtWidgets.QLabel("0 archivos multimedia detectados en esta carpeta")
         left_layout.addWidget(self.folder_count_label)
-
+        
         self.chk_lyric = QtWidgets.QCheckBox("Es lirica")
         self.chk_lyric.setChecked(False)
         self.chk_lyric.hide()
         self.chk_lyric.toggled.connect(self.on_lyric_checkbox_toggled)
         left_layout.addWidget(self.chk_lyric)
-
+        
         self.file_table = FileTableWidget()
         self.file_table.itemSelectionChanged.connect(self.on_file_selected)
         self.file_table.row_count_changed.connect(self.on_file_count_changed)
         # left_layout.addWidget(self.file_table, 1)
-
+        
         files_row = QtWidgets.QHBoxLayout()
         files_row.setSpacing(6)
+        
         files_row.addWidget(self.year_selector_bar)
         files_row.addWidget(self.folder_selector_bar)
         files_row.addWidget(self.file_table, 1)
         left_layout.addLayout(files_row, 1)
-
+        
         self.metadata_progress_label = QtWidgets.QLabel("0/0")
         left_layout.addWidget(self.metadata_progress_label)
 
@@ -120,12 +127,12 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.metadata_progress_bar.setRange(0, 100)
         self.metadata_progress_bar.setValue(0)
         left_layout.addWidget(self.metadata_progress_bar)
-
+        
         self.file_table.set_progress_widgets(
             self.metadata_progress_bar,
             self.metadata_progress_label,
         )
-
+        
         overwrite_btns = QtWidgets.QHBoxLayout()
         botones_config = [
             ('Overwrite P', "ov_0"),
@@ -140,25 +147,25 @@ class VideoEtude(QtWidgets.QMainWindow):
             overwrite_btns.addWidget(btn)
 
         left_layout.addLayout(overwrite_btns)
-
+        
         btns_left = QtWidgets.QHBoxLayout()
         self.btn_load_selected = QtWidgets.QPushButton('Load Selected')
         self.btn_load_selected.clicked.connect(self.load_selected_file)
         self.btn_load_selected.setEnabled(False)
         btns_left.addWidget(self.btn_load_selected)
-
+                
         self.btn_open_file = QtWidgets.QPushButton('Open other video')
         self.btn_open_file.clicked.connect(self.open_video_dialog)
         btns_left.addWidget(self.btn_open_file)
-
+        
         self.btn_check_smb = QtWidgets.QPushButton('Check SMB')
         self.btn_check_smb.clicked.connect(self.open_smb_dialog)
         btns_left.addWidget(self.btn_check_smb)
-
+        
         self.btn_toggle_workframe = QtWidgets.QPushButton('Hide/Show Workframe')
         self.btn_toggle_workframe.clicked.connect(self.toggle_workframe_visibility)
         btns_left.addWidget(self.btn_toggle_workframe)
-
+        
         left_layout.addLayout(btns_left)
         self.main_layout.addWidget(self.left_panel, 0)
 
@@ -254,7 +261,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.combo_year.setCurrentIndex(idx)
             self.year_selector_bar.select_year(current_year, emit=False)
             self.on_year_changed(idx)
-
+    
     def on_year_bar_selected(self, year: str):
         idx = self.combo_year.findText(year)
         if idx < 0:
@@ -267,7 +274,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.combo_year.blockSignals(old)
 
         self.on_year_changed(idx)
-
+        
     def on_year_changed(self, idx):
         self.exit_lyric_mode(uncheck=True)
         self.chk_lyric.hide()
@@ -276,9 +283,9 @@ class VideoEtude(QtWidgets.QMainWindow):
         year = self.combo_year.currentText()
         if not year or year == '(no encontrado)':
             return
-
+        
         year_path = os.path.join(config.BASE_INTERNAL_ROOT, year)
-
+        
         # buscar carpeta que contenga '___[' en su nombre
         found = None
         try:
@@ -289,16 +296,17 @@ class VideoEtude(QtWidgets.QMainWindow):
                     break
         except Exception:
             found = None
+        
         if not found:
             return
-
+        
         try:
             hide_overwrite_1 = int(year) >= 2026
         except ValueError:
             hide_overwrite_1 = False
 
         self.file_table.set_overwrite_1_hidden(hide_overwrite_1)
-
+        
         # listar subcarpetas de found
         try:
             subs = [os.path.join(found, d) for d in os.listdir(found) if os.path.isdir(os.path.join(found, d))]
@@ -308,8 +316,6 @@ class VideoEtude(QtWidgets.QMainWindow):
                 self.folder_selector_bar.setCurrentRow(0)
         except Exception:
             pass
-
-
 
     def on_master_changed(self, path: str):
         self.exit_lyric_mode(uncheck=True)
@@ -361,7 +367,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         )
 
     def get_episode_titles_temp(self):
-        py_execute = sys.executable
+        py_execute = sys.executable  
         cur_fr_script = os.path.dirname(os.path.abspath(__file__))
         child_script = os.path.join(cur_fr_script, "temp_eps_list_get.pyw")
         year = self.combo_year.currentText()
@@ -393,10 +399,10 @@ class VideoEtude(QtWidgets.QMainWindow):
     def on_file_selected(self):
         has_file = bool(self.file_table.current_file_path())
         self.btn_load_selected.setEnabled(has_file)
-
+        
         if self.lyric_mode and has_file:
             self.load_current_lyric_entry()
-
+        
     def load_selected_file(self):
         self.exit_lyric_mode(uncheck=True)
         video_path = self.file_table.current_file_path()
@@ -411,7 +417,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.start_worker_and_open(video_path)
         self.check_curtain.setChecked(True)
 
-
+    
     def rescan_selected_row(self):
         row = self.file_table.currentRow()
 
@@ -531,8 +537,8 @@ class VideoEtude(QtWidgets.QMainWindow):
                 h, w, _ = arr.shape
                 qimg = QtGui.QImage(arr.data, w, h, arr.strides[0], QtGui.QImage.Format.Format_RGB888)
                 pix = QtGui.QPixmap.fromImage(qimg).scaled(
-                    self.thumb_labels[label_index].size(),
-                    QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+                    self.thumb_labels[label_index].size(), 
+                    QtCore.Qt.AspectRatioMode.KeepAspectRatio, 
                     QtCore.Qt.TransformationMode.SmoothTransformation
                     )
             except Exception:
@@ -606,7 +612,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.curtain.raise_()
         else:
             self.curtain.hide()
-
+            
     def update_curtain_visibility(self):
         try:
             self.update_curtain_geometry()
@@ -694,9 +700,9 @@ class VideoEtude(QtWidgets.QMainWindow):
             loop.quit()
         self.worker.frames_ready.connect(_on)
         QtCore.QMetaObject.invokeMethod(
-            self.worker, "request_frames",
+            self.worker, "request_frames", 
             QtCore.Qt.ConnectionType.QueuedConnection,
-            QtCore.Q_ARG(int, frame_num),
+            QtCore.Q_ARG(int, frame_num), 
             QtCore.Q_ARG(bool, False)
             )
         timer = QtCore.QTimer()
@@ -738,7 +744,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         downloads = os.path.join(os.path.expanduser("~"), "Downloads")
         now = datetime.datetime.now()
         filename_base = now.strftime("%Y%m%d_%H%M%S")
-
+        
         tmp_path = os.path.join(downloads, filename_base + ".tmp")
         final_path = os.path.join(downloads, filename_base + ".png")
 
@@ -768,7 +774,7 @@ class VideoEtude(QtWidgets.QMainWindow):
                 "Error",
                 f"No se pudo exportar la imagen.\n{e}"
             )
-
+            
     def copy_time_to_clipboard(self):
         t = self.entry_time.text().strip()
         if t:
@@ -950,7 +956,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         dlg = CutDialog(self, self.worker.path, default_start, default_end, fps, width, height)
         dlg.show()
 
-
+    
     def edit_selected_metadata(self):
         video_path = self.file_table.current_file_path()
         if not video_path:
@@ -976,7 +982,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         self._set_workframe_visible(self.right_widget.isVisible())
 
     def _set_workframe_visible(self, visible: bool):
-
+        
         if visible:
             self.left_panel.setFixedWidth(550)
             self.left_panel.setSizePolicy(
@@ -994,7 +1000,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             )
             self.main_layout.setStretch(0, 1)
             self.main_layout.setStretch(1, 0)
-
+            
 
         self.left_panel.updateGeometry()
         self.right_widget.updateGeometry()
@@ -1153,7 +1159,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         next_row = 0 if row + 1 >= self.file_table.rowCount() else row + 1
         self.file_table.setCurrentCell(next_row, 0)
         self.load_current_lyric_entry()
-
+        
     def prev_lyric_entry(self):
         if self.file_table.rowCount() <= 0:
             return
@@ -1161,10 +1167,10 @@ class VideoEtude(QtWidgets.QMainWindow):
         row = self._selected_row_index_for_lyrics()
         # Si la fila actual es 0 o menor (ninguna selección), va a la última fila, si no, resta 1.
         prev_row = self.file_table.rowCount() - 1 if row <= 0 else row - 1
-
+        
         self.file_table.setCurrentCell(prev_row, 0)
         self.load_current_lyric_entry()
-
+    
     def open_settings_dialog(self):
         dlg = SettingsDialog(self)
         if dlg.exec():
@@ -1186,7 +1192,7 @@ class VideoEtude(QtWidgets.QMainWindow):
                         QtWidgets.QSizePolicy.Policy.Fixed,
                     )
                     self.thumb_labels.append(lbl)
-
+            
             # Update spacing
             self.thumb_layout.setSpacing(config.THUMB_SPACING)
 
