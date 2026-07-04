@@ -15,6 +15,7 @@ from lyric_vision_panel import LyricVisionPanel
 from about_season_dialog import AboutSeasonDialog
 from year_selector_bar import YearSelectorBar
 from folder_selector_bar import FolderSelectorBar
+import year_creator
 
 class VideoEtude(QtWidgets.QMainWindow):
     def __init__(self):
@@ -49,6 +50,8 @@ class VideoEtude(QtWidgets.QMainWindow):
         
         self.year_selector_bar = YearSelectorBar()
         self.year_selector_bar.yearSelected.connect(self.on_year_bar_selected)
+        self.year_selector_bar.hiddenYearSelected.connect(self.on_hidden_year_selected)
+        self.year_selector_bar.createNewYearRequested.connect(self.on_create_new_year_requested)
         
         self.folder_selector_bar = FolderSelectorBar()
         self.folder_selector_bar.folderSelected.connect(self.on_master_changed)
@@ -243,8 +246,17 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.show()
 
     # ---------------- Left panel helpers ----------------
-    def populate_years(self):
-        years = [str(y) for y in range(2004, datetime.date.today().year + 1)]
+    def populate_years(self, select_year_str: str = None):
+        # List actual folders in BASE_INTERNAL_ROOT that are numeric years >= 2004
+        years = []
+        try:
+            for name in os.listdir(config.BASE_INTERNAL_ROOT):
+                # Verifica que sea número, tenga 4 dígitos y sea igual o mayor a 2004
+                if name.isdigit() and len(name) == 4 and int(name) >= 2004:
+                    years.append(name)
+            years.sort()
+        except Exception:
+            years = [str(y) for y in range(2004, datetime.date.today().year + 1)]
 
         self.combo_year.blockSignals(True)
         try:
@@ -255,11 +267,11 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         self.year_selector_bar.set_years(years)
 
-        current_year = str(datetime.date.today().year)
-        idx = self.combo_year.findText(current_year)
+        target_year = select_year_str if select_year_str else str(datetime.date.today().year)
+        idx = self.combo_year.findText(target_year)
         if idx >= 0:
             self.combo_year.setCurrentIndex(idx)
-            self.year_selector_bar.select_year(current_year, emit=False)
+            self.year_selector_bar.select_year(target_year, emit=False)
             self.on_year_changed(idx)
     
     def on_year_bar_selected(self, year: str):
@@ -275,23 +287,53 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         self.on_year_changed(idx)
         
+    def on_hidden_year_selected(self, year: str):
+        self.year_selector_bar.select_year("", emit=False)
+        self.load_year_data(year)
+        
+    def on_create_new_year_requested(self):
+        # Get the highest year currently in the interface
+        years = [self.combo_year.itemText(i) for i in range(self.combo_year.count())]
+        if not years:
+            return
+
+        last_year = max(years)
+        next_year = int(last_year) + 1
+
+        msg = f"el siguiente año es {next_year} y se creara con la estrucutura del año pasado, ¿Desea continuar?"
+        confirm = QtWidgets.QMessageBox.question(
+            self, "Crear nuevo año", msg,
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
+        )
+
+        if confirm == QtWidgets.QMessageBox.StandardButton.Yes:
+            success, result = year_creator.create_new_year_folder(config.BASE_INTERNAL_ROOT, last_year)
+            if success:
+                self.populate_years(select_year_str=result)
+            else:
+                QtWidgets.QMessageBox.warning(self, "Error", result)
+
     def on_year_changed(self, idx):
+        year = self.combo_year.currentText()
+        self.load_year_data(year)
+        
+    def load_year_data(self, year: str):
         self.exit_lyric_mode(uncheck=True)
         self.chk_lyric.hide()
         self.folder_selector_bar.set_folders([])
         self.btn_check.hide()
-        year = self.combo_year.currentText()
-        if not year or year == '(no encontrado)':
+        
+        if not year or year == "(no encontrado)":
             return
         
         year_path = os.path.join(config.BASE_INTERNAL_ROOT, year)
         
-        # buscar carpeta que contenga '___[' en su nombre
+        # buscar carpeta que contenga "___[" en su nombre
         found = None
         try:
             for name in os.listdir(year_path):
                 full = os.path.join(year_path, name)
-                if os.path.isdir(full) and '___[' in name:
+                if os.path.isdir(full) and "___[" in name:
                     found = full
                     break
         except Exception:

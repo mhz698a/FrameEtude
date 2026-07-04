@@ -7,6 +7,8 @@ from PyQt6 import QtCore, QtWidgets
 
 class YearSelectorBar(QtWidgets.QTableWidget):
     yearSelected = QtCore.pyqtSignal(str)
+    hiddenYearSelected = QtCore.pyqtSignal(str)
+    createNewYearRequested = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -14,6 +16,9 @@ class YearSelectorBar(QtWidgets.QTableWidget):
         self._years: list[str] = []
         self._cell_width = 30
         self._cell_height = 24
+        
+        self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
 
         self.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
@@ -55,6 +60,11 @@ class YearSelectorBar(QtWidgets.QTableWidget):
         self._rebuild()
 
     def select_year(self, year: str, emit: bool = False) -> None:
+        if not year:
+            self.clearSelection()
+            self.setCurrentItem(None)
+            return
+        
         year = str(year)
 
         for row in range(self.rowCount()):
@@ -87,6 +97,19 @@ class YearSelectorBar(QtWidgets.QTableWidget):
         item = self.currentItem()
         if item:
             self.yearSelected.emit(item.text())
+
+    def _show_context_menu(self, pos: QtCore.QPoint) -> None:
+        menu = QtWidgets.QMenu(self)
+        
+        hidden_years_menu = menu.addMenu("Seleccionar años ocultos")
+        for y in ["1999", "2000", "2001", "2002", "2003"]:
+            action = hidden_years_menu.addAction(y)
+            action.triggered.connect(lambda checked, year=y: self.hiddenYearSelected.emit(year))
+            
+        create_action = menu.addAction("Crear nuevo año")
+        create_action.triggered.connect(self.createNewYearRequested.emit)
+        
+        menu.exec(self.mapToGlobal(pos))
 
     def _rebuild(self, preserve: str = "", lim_col = True) -> None:
         years = self._years[:]
@@ -144,3 +167,4 @@ class YearSelectorBar(QtWidgets.QTableWidget):
             self.select_year(preserve, emit=False)
         else:
             self.select_year(str(datetime.date.today().year), emit=False)
+            
