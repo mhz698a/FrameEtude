@@ -17,7 +17,6 @@ from year_selector_bar import YearSelectorBar
 from folder_selector_bar import FolderSelectorBar
 import year_creator
 
-
 class VideoEtude(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -53,7 +52,6 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.year_selector_bar.yearSelected.connect(self.on_year_bar_selected)
         self.year_selector_bar.hiddenYearSelected.connect(self.on_hidden_year_selected)
         self.year_selector_bar.createNewYearRequested.connect(self.on_create_new_year_requested)
-
         
         self.folder_selector_bar = FolderSelectorBar()
         self.folder_selector_bar.folderSelected.connect(self.on_master_changed)
@@ -249,11 +247,12 @@ class VideoEtude(QtWidgets.QMainWindow):
 
     # ---------------- Left panel helpers ----------------
     def populate_years(self, select_year_str: str = None):
-        # List actual folders in BASE_INTERNAL_ROOT that are numeric years
+        # List actual folders in BASE_INTERNAL_ROOT that are numeric years >= 2004
         years = []
         try:
             for name in os.listdir(config.BASE_INTERNAL_ROOT):
-                if name.isdigit() and len(name) == 4:
+                # Verifica que sea número, tenga 4 dígitos y sea igual o mayor a 2004
+                if name.isdigit() and len(name) == 4 and int(name) >= 2004:
                     years.append(name)
             years.sort()
         except Exception:
@@ -287,11 +286,11 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.combo_year.blockSignals(old)
 
         self.on_year_changed(idx)
-
+        
     def on_hidden_year_selected(self, year: str):
         self.year_selector_bar.select_year("", emit=False)
         self.load_year_data(year)
-
+        
     def on_create_new_year_requested(self):
         # Get the highest year currently in the interface
         years = [self.combo_year.itemText(i) for i in range(self.combo_year.count())]
@@ -313,17 +312,17 @@ class VideoEtude(QtWidgets.QMainWindow):
                 self.populate_years(select_year_str=result)
             else:
                 QtWidgets.QMessageBox.warning(self, "Error", result)
-        
+
     def on_year_changed(self, idx):
         year = self.combo_year.currentText()
         self.load_year_data(year)
-
+        
     def load_year_data(self, year: str):
         self.exit_lyric_mode(uncheck=True)
         self.chk_lyric.hide()
         self.folder_selector_bar.set_folders([])
         self.btn_check.hide()
-
+        
         if not year or year == "(no encontrado)":
             return
         
@@ -359,6 +358,7 @@ class VideoEtude(QtWidgets.QMainWindow):
                 self.folder_selector_bar.setCurrentRow(0)
         except Exception:
             pass
+
     def on_master_changed(self, path: str):
         self.exit_lyric_mode(uncheck=True)
 
