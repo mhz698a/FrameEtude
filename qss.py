@@ -54,7 +54,6 @@ QComboBox QAbstractItemView {
     selection-background-color: #2e88ff;
     color: #e6e6e6;
 }
-
 QSlider::groove:horizontal {
     border: 1px solid #2b2b2d;
     height: 6px;
