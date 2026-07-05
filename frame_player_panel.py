@@ -51,6 +51,11 @@ class FramePlayerPanel(QtWidgets.QWidget):
         main.selection_overlay.setGeometry(0, 0, 800, 200)
         main.selection_overlay.selection_made.connect(main._on_selection_made)
 
+        main.video_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        main.video_slider.sliderReleased.connect(main.on_slider_released)
+        main.video_slider.valueChanged.connect(main.on_slider_value_changed)
+        layout.addWidget(main.video_slider)
+
         controls_nav = QtWidgets.QHBoxLayout()
 
         btn_fc = QtWidgets.QPushButton("Fc")

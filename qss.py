@@ -54,6 +54,32 @@ QComboBox QAbstractItemView {
     selection-background-color: #2e88ff;
     color: #e6e6e6;
 }
+QSlider::groove:horizontal {
+    border: 1px solid #2b2b2d;
+    height: 6px;
+    background: #1e1e1f;
+    margin: 2px 0;
+    border-radius: 3px;
+}
+
+QSlider::handle:horizontal {
+    background: #3a3a3c;
+    border: 1px solid #5c5c5c;
+    width: 18px;
+    height: 18px;
+    margin: -7px 0;
+    border-radius: 9px;
+}
+
+QSlider::handle:horizontal:hover {
+    background: #4a4a4c;
+    border: 1px solid #2e88ff;
+}
+
+QSlider::sub-page:horizontal {
+    background: #2e88ff;
+    border-radius: 3px;
+}
 """
 
 Old_qss = """
