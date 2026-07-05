@@ -546,6 +546,12 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.video_name = os.path.basename(self.worker.path) if hasattr(self.worker, "path") else ""
         self.info_label.setText(f"{self.video_name} - {format_time(self.frame_count / (self.fps or 25.0))}")
         self.frame_actual = 0
+
+        self.video_slider.blockSignals(True)
+        self.video_slider.setRange(0, self.frame_count - 1)
+        self.video_slider.setValue(0)
+        self.video_slider.blockSignals(False)
+
         self.rebuild_thumb_layout()
         self.request_current_frames()
 
@@ -676,6 +682,11 @@ class VideoEtude(QtWidgets.QMainWindow):
     def show_frames(self, frame_num):
         self.frame_actual = max(0, min(frame_num, max(0, self.frame_count-1)))
         self.entry_time.setText(format_time(None, frame_num=self.frame_actual, fps=self.fps or 25.0))
+
+        self.video_slider.blockSignals(True)
+        self.video_slider.setValue(self.frame_actual)
+        self.video_slider.blockSignals(False)
+
         self.request_current_frames()
 
     def move_frame(self, cantidad):
@@ -709,6 +720,17 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.show_frames(self.frame_actual)
         except Exception:
             QtWidgets.QMessageBox.critical(self, "Error", "Formato de tiempo incorrecto. Use hh:mm:ss.mmm")
+
+    def on_slider_released(self):
+        if self.worker is None:
+            return
+        self.show_frames(self.video_slider.value())
+
+    def on_slider_value_changed(self, value):
+        if self.worker is None:
+            return
+        # Solo actualizar el texto del tiempo mientras se arrastra para rendimiento
+        self.entry_time.setText(format_time(None, frame_num=value, fps=self.fps or 25.0))
 
     # ---------------- Clipboard / Export (unchanged) ----------------
     def pil_to_dib(self, img_pil: Image.Image) -> bytes:
