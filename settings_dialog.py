@@ -139,6 +139,17 @@ class SettingsDialog(QtWidgets.QDialog):
         season_layout.addWidget(self.btn_browse_season)
         self.gen_layout.addRow("Season DB:", season_layout)
 
+        # Campo para BACKUP_PATH
+        self.backup_path = QtWidgets.QLineEdit()
+        self.backup_path.setText(config.BACKUP_PATH)
+        self.btn_browse_backup = QtWidgets.QPushButton("Browse...")
+        self.btn_browse_backup.clicked.connect(self._browse_backup_path)
+
+        backup_layout = QtWidgets.QHBoxLayout()
+        backup_layout.addWidget(self.backup_path)
+        backup_layout.addWidget(self.btn_browse_backup)
+        self.gen_layout.addRow("Backup Path:", backup_layout)
+
         self.tabs.addTab(self.gen_tab, "General")
 
         # --- Buttons ---
@@ -186,6 +197,14 @@ class SettingsDialog(QtWidgets.QDialog):
         if file_path:
             self.season_db.setText(file_path)
 
+    def _browse_backup_path(self):
+        """Abre explorador nativo para seleccionar el directorio de respaldo."""
+        dir_path = QtWidgets.QFileDialog.getExistingDirectory(
+            self, "Select Backup Directory", self.backup_path.text()
+        )
+        if dir_path:
+            self.backup_path.setText(dir_path)
+
     def save(self):
         # Empaquetar datos de OCR respetando tus tipos de datos originales
         new_ocr = {
@@ -211,7 +230,8 @@ class SettingsDialog(QtWidgets.QDialog):
             "RENAME_DIALOG_SCRIPT": str(self.rename_script.text()),
             "BASE_INTERNAL_ROOT": str(self.internal_root.text()),
             "OVERWRITE_DATABASE": str(self.overwrite_db.text()),
-            "SEASON_DATABASE": str(self.season_db.text())
+            "SEASON_DATABASE": str(self.season_db.text()),
+            "BACKUP_PATH": str(self.backup_path.text())
         }
 
         # Enviar los datos al puente de guardado seguro
