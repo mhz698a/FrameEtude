@@ -78,6 +78,10 @@ class FolderSelectorBar(QtWidgets.QListWidget):
             open_action = menu.addAction("Abrir esta carpeta en el explorador")
             open_action.triggered.connect(lambda: os.startfile(path))
             
+        menu.addSeparator()
+        refresh_action = menu.addAction("Refresh master")
+        refresh_action.triggered.connect(lambda: self.folderChanged.emit())
+
         menu.exec(self.mapToGlobal(pos))
 
     def _is_folder_empty_for_delete(self, path: str) -> bool:
