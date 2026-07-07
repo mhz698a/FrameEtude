@@ -6,6 +6,8 @@ from pathlib import Path
 APP_NAME = "FrameEtude"
 ID_APP = 'etude_video.FrameEtude.VideoFramesInspector.v2'
 ID_APP_LIRYCS = 'etude_video.LyricManagment.LyricsBook.v2'
+ID_APP_PHASE_GEN = 'etude_video.LyricManagment.PlanMdGen.v1'
+ID_APP_TMP_EP = 'etude_video.LyricManagment.temp_EpList.v1'
 
 USER_HOME = Path.home()
 APP_DIR = Path(__file__).resolve().parent.as_posix()

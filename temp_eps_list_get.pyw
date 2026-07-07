@@ -1,6 +1,9 @@
+import ctypes
 import sys
 from openpyxl import load_workbook
 from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6 import QtGui
+import config
 
 SHEET_NAME = "material_list"
 
@@ -12,7 +15,9 @@ HEADER_ROW = 3
 DATA_START_ROW = HEADER_ROW + 1
 
 def main():
-    app = QApplication.instance()
+    app = QApplication(sys.argv)
+    app.setWindowIcon(QtGui.QIcon(config.ICON_PATH))
+    
     if app is None:
         app = QApplication(sys.argv)
     
@@ -58,4 +63,5 @@ def main():
     msg.exec()
 
 if __name__ == "__main__":
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(config.ID_APP_PHASE_GEN)
     main()

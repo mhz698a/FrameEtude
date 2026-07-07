@@ -62,14 +62,17 @@ class VideoEtude(QtWidgets.QMainWindow):
         h2_master = QtWidgets.QHBoxLayout()
         self.base_label = QtWidgets.QLabel('<b>E:\\_Internal\\...\\___[...]\\...\\...</b>')
         
+        self.btn_settings = QtWidgets.QPushButton("Settings")
+        self.btn_settings.clicked.connect(self.open_settings_dialog)
+        
         self.btn_about = QtWidgets.QPushButton("About")
         self.btn_about.clicked.connect(self.open_about_dialog)
         
         self.btn_rescan = QtWidgets.QPushButton("Refresh This folder")
         self.btn_rescan.clicked.connect(self.rescan_current_master_folder)
         
-        self.btn_settings = QtWidgets.QPushButton("Settings")
-        self.btn_settings.clicked.connect(self.open_settings_dialog)
+        self.btn_phasegen = QtWidgets.QPushButton("Gen Plan.md")
+        self.btn_phasegen.clicked.connect(self.phase_gen_exec)
         
         self.btn_etude = QtWidgets.QPushButton("Etude")
         self.btn_etude.clicked.connect(self.open_etude_file)
@@ -88,10 +91,11 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_check.hide()
         
         h1_master.addWidget(self.base_label, 1)
+        h1_master.addWidget(self.btn_settings)
         h1_master.addWidget(self.btn_about)
         h1_master.addWidget(self.btn_rescan)
         
-        h2_master.addWidget(self.btn_settings)
+        h2_master.addWidget(self.btn_phasegen)
         h2_master.addWidget(self.btn_etude)
         h2_master.addWidget(self.btn_ovreg1)
         h2_master.addWidget(self.btn_ovreg2)        
@@ -104,7 +108,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.folder_count_label = QtWidgets.QLabel("0 archivos multimedia detectados en esta carpeta")
         left_layout.addWidget(self.folder_count_label)
         
-        self.chk_lyric = QtWidgets.QCheckBox("Es lirica")
+        self.chk_lyric = QtWidgets.QCheckBox("Es lirica/Plan.md")
         self.chk_lyric.setChecked(False)
         self.chk_lyric.hide()
         self.chk_lyric.toggled.connect(self.on_lyric_checkbox_toggled)
@@ -395,6 +399,17 @@ class VideoEtude(QtWidgets.QMainWindow):
         px = f"{int(year) - 2003:02d}"
         os.startfile(f"{'E:/_Internal'}/{year}/{px}. identity/{px}. le_etude.overwrite.xlsx")
 
+    def phase_gen_exec(self):
+        py_execute = sys.executable
+        year = self.combo_year.currentText()
+        cur_fr_script = os.path.dirname(os.path.abspath(__file__))
+        child_script = os.path.join(cur_fr_script, "phase_gen.pyw")
+        CREATE_NO_WINDOW = 0x08000000
+        
+        subprocess.Popen(
+            [py_execute, child_script, year],
+            creationflags=CREATE_NO_WINDOW
+        )
 
     def get_reg_ov_temp(self, ov_ver: str):
         py_execute = sys.executable
