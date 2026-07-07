@@ -57,7 +57,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.folder_selector_bar.folderSelected.connect(self.on_master_changed)
         self.folder_selector_bar.folderChanged.connect(
             lambda: self.on_year_changed(self.combo_year.currentIndex())
-            )
+        )
         
         h2_master = QtWidgets.QHBoxLayout()
         self.base_label = QtWidgets.QLabel('<b>E:\\_Internal\\...\\___[...]\\...\\...</b>')
@@ -65,12 +65,12 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_about = QtWidgets.QPushButton("About")
         self.btn_about.clicked.connect(self.open_about_dialog)
         
-        self.btn_rescan = QtWidgets.QPushButton("Refresh")
+        self.btn_rescan = QtWidgets.QPushButton("Refresh This folder")
         self.btn_rescan.clicked.connect(self.rescan_current_master_folder)
         
         self.btn_settings = QtWidgets.QPushButton("Settings")
         self.btn_settings.clicked.connect(self.open_settings_dialog)
-                
+        
         self.btn_etude = QtWidgets.QPushButton("Etude")
         self.btn_etude.clicked.connect(self.open_etude_file)
         
