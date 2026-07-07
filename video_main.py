@@ -1089,7 +1089,12 @@ class VideoEtude(QtWidgets.QMainWindow):
     def update_lyrics_check_button_visibility(self):
         path = self.folder_selector_bar.current_folder_path().strip()
         base = path if os.path.isdir(path) else os.path.dirname(path)
-        show = bool(base and os.path.basename(base.rstrip("\\/")).lower().endswith("lyrics"))
+        if not base:
+            self.btn_check.setVisible(False)
+            return
+
+        folder_name = os.path.basename(base.rstrip("\\/")).lower()
+        show = folder_name.endswith("lyrics") or folder_name.endswith("wroad") or folder_name.endswith("writed")
         self.btn_check.setVisible(show)
 
     def open_lyrics_manager(self):
@@ -1098,7 +1103,8 @@ class VideoEtude(QtWidgets.QMainWindow):
             return
 
         base = path if os.path.isdir(path) else os.path.dirname(path)
-        if not os.path.basename(base.rstrip("\\/")).lower().endswith("lyrics"):
+        folder_name = os.path.basename(base.rstrip("\\/")).lower()
+        if not (folder_name.endswith("lyrics") or folder_name.endswith("wroad") or folder_name.endswith("writed")):
             return
 
         script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lirycs_mgr.pyw")
