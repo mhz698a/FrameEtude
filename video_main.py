@@ -62,6 +62,9 @@ class VideoEtude(QtWidgets.QMainWindow):
         h2_master = QtWidgets.QHBoxLayout()
         self.base_label = QtWidgets.QLabel('<b>E:\\_Internal\\...\\___[...]\\...\\...</b>')
         
+
+        self.btn_backup = QtWidgets.QPushButton("Backup")
+        self.btn_backup.clicked.connect(self.launch_backup)
         self.btn_settings = QtWidgets.QPushButton("Settings")
         self.btn_settings.clicked.connect(self.open_settings_dialog)
         
@@ -116,6 +119,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         h1_master.addWidget(self.btn_about)
         h1_master.addWidget(self.btn_rescan)
         
+        h2_master.addWidget(self.btn_backup)
         h2_master.addWidget(self.btn_phasegen)
         h2_master.addWidget(self.btn_etude)
         h2_master.addWidget(self.btn_ovreg1)
@@ -412,6 +416,17 @@ class VideoEtude(QtWidgets.QMainWindow):
         year = self.combo_year.currentText()
         px = f"{int(year) - 2003:02d}"
         os.startfile(f"{'E:/_Internal'}/{year}/{px}. identity/{px}. le_etude.overwrite.xlsx")
+
+    def launch_backup(self):
+        py_execute = sys.executable
+        cur_fr_script = os.path.dirname(os.path.abspath(__file__))
+        child_script = os.path.join(cur_fr_script, "backup.pyw")
+        CREATE_NO_WINDOW = 0x08000000
+
+        subprocess.Popen(
+            [py_execute, child_script],
+            creationflags=CREATE_NO_WINDOW
+        )
 
     def phase_gen_exec(self):
         py_execute = sys.executable
