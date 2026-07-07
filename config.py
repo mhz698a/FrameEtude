@@ -16,6 +16,7 @@ ICON_PATH_LIRYCS = f"{APP_DIR}/assets/lyricsbook.ico"
 ICON_PATH = f"{APP_DIR}/assets/frameetude.ico"
 VIDEO_EXTS = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv'}
 THUMB_ASPECT = 9/16
+VALID_FOLDER_SUFFIXES = ("lyrics", "wroad", "writed")
 
 APPDATA_DIR = Path(os.getenv("APPDATA", USER_HOME)) / APP_NAME
 APPDATA_DIR.mkdir(parents=True, exist_ok=True)

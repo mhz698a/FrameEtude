@@ -15,7 +15,7 @@ from PyQt6.QtCore import Qt
 import config
 
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(config.ID_APP_LIRYCS)
-
+WINDOW_TITLE = "LyricsBook & PlanBook"
 
 class LirycsBook(QMainWindow):
     LIST_WIDTH = 350  # ancho fijo del panel de lista
@@ -26,7 +26,7 @@ class LirycsBook(QMainWindow):
         if os.path.exists(config.ICON_PATH_LIRYCS):
             self.setWindowIcon(QIcon(config.ICON_PATH_LIRYCS))
 
-        self.setWindowTitle("LyricsBook")
+        self.setWindowTitle(WINDOW_TITLE)
         self.resize(1200, 600)
         self.txt_files = []
         self.current_index = 0
@@ -217,7 +217,7 @@ class LirycsBook(QMainWindow):
             self.text.clear()
             self.text.blockSignals(False)
             self.update_status()
-            self.setWindowTitle("LyricsBook")
+            self.setWindowTitle(WINDOW_TITLE)
 
     # === Operaciones con archivos ===
     def open_file(self, filepath):
@@ -251,7 +251,7 @@ class LirycsBook(QMainWindow):
             self.current_index = 0
 
         self.update_status()
-        self.setWindowTitle(f"LyricsBook - {os.path.basename(filepath)}")
+        self.setWindowTitle(f"{WINDOW_TITLE} - {os.path.basename(filepath)}")
 
     def save_file(self):
         if not self.current_file:
