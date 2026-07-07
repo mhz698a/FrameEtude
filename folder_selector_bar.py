@@ -69,9 +69,11 @@ class FolderSelectorBar(QtWidgets.QListWidget):
             
             rename_action = menu.addAction("Renombrar esta carpeta")
             rename_action.triggered.connect(lambda: self._rename_folder(item))
-
+            
             copy_name_action = menu.addAction("Copy folder name")
-            copy_name_action.triggered.connect(lambda: QtWidgets.QApplication.clipboard().setText(os.path.basename(path.rstrip("\\/"))))
+            copy_name_action.triggered.connect(
+                lambda: QtWidgets.QApplication.clipboard().setText(os.path.basename(path.rstrip("\\/")))
+            )
 
             copy_path_action = menu.addAction("Copy folder path")
             copy_path_action.triggered.connect(lambda: QtWidgets.QApplication.clipboard().setText(path))
@@ -84,10 +86,11 @@ class FolderSelectorBar(QtWidgets.QListWidget):
             open_action = menu.addAction("Abrir esta carpeta en el explorador")
             open_action.triggered.connect(lambda: os.startfile(path))
             
-        menu.addSeparator()
-        refresh_action = menu.addAction("Refresh master")
-        refresh_action.triggered.connect(lambda: self.folderChanged.emit())
-
+            menu.addSeparator()
+            
+            refresh_action = menu.addAction("Refresh Master Folders")
+            refresh_action.triggered.connect(lambda: self.folderChanged.emit())
+            
         menu.exec(self.mapToGlobal(pos))
 
     def _is_folder_empty_for_delete(self, path: str) -> bool:
