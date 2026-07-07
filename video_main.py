@@ -60,9 +60,6 @@ class VideoEtude(QtWidgets.QMainWindow):
         )
         
         h2_master = QtWidgets.QHBoxLayout()
-        self.btn_backup = QtWidgets.QPushButton("Backup")
-        self.btn_backup.clicked.connect(self.run_backup_csv)
-
         self.base_label = QtWidgets.QLabel('<b>E:\\_Internal\\...\\___[...]\\...\\...</b>')
         
         self.btn_settings = QtWidgets.QPushButton("Settings")
@@ -73,6 +70,9 @@ class VideoEtude(QtWidgets.QMainWindow):
         
         self.btn_rescan = QtWidgets.QPushButton("Refresh This folder")
         self.btn_rescan.clicked.connect(self.rescan_current_master_folder)
+        
+        self.btn_backup = QtWidgets.QPushButton("Backup")
+        self.btn_backup.clicked.connect(self.run_backup_csv)
         
         self.btn_phasegen = QtWidgets.QPushButton("Gen Plan.md")
         self.btn_phasegen.clicked.connect(self.phase_gen_exec)
@@ -1288,12 +1288,12 @@ class VideoEtude(QtWidgets.QMainWindow):
         cur_fr_script = os.path.dirname(os.path.abspath(__file__))
         child_script = os.path.join(cur_fr_script, "backup_csv.pyw")
         CREATE_NO_WINDOW = 0x08000000
-
+        
         subprocess.Popen(
             [py_execute, child_script],
             creationflags=CREATE_NO_WINDOW
         )
-
+    
     def open_settings_dialog(self):
         dlg = SettingsDialog(self)
         if dlg.exec():

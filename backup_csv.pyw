@@ -2,6 +2,7 @@ import os
 import sys
 import csv
 import json
+import ctypes
 import traceback
 import datetime
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -15,6 +16,8 @@ except ImportError:
 import config
 from duration_async_lib import probe_duration_text
 from metadata_edit_lib import comment_display_value
+
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(config.ID_APP_BACKUP)
 
 # Metadata columns from FrameEtude
 COLUMNS = [
@@ -108,7 +111,7 @@ class BackupWorker(QtCore.QThread):
                 year_path = os.path.join(config.BASE_INTERNAL_ROOT, year)
                 if not os.path.isdir(year_path):
                     continue
-
+                
                 # Find master folder (contains "___[")
                 master_folder = None
                 try:
@@ -119,7 +122,7 @@ class BackupWorker(QtCore.QThread):
                             break
                 except Exception:
                     continue
-
+                
                 if not master_folder:
                     continue
 
@@ -129,7 +132,7 @@ class BackupWorker(QtCore.QThread):
                         sub_full = os.path.join(master_folder, sub)
                         if not os.path.isdir(sub_full):
                             continue
-
+                        
                         sub_lower = sub.lower()
                         # Important folders according to requirements
                         if any(kw in sub_lower for kw in ["_eps.on", "mov_", "sp.on", "vocals"]):
@@ -144,17 +147,17 @@ class BackupWorker(QtCore.QThread):
 
             for i, (year, sub_name, sub_path) in enumerate(tasks):
                 self.progress.emit(i, total_tasks, f"Respaldando {year} - {sub_name}")
-
+                
                 csv_filename = f"{year}-{sub_name}.csv"
                 csv_path = os.path.join(self.backup_root, csv_filename)
-
+                
                 files = sorted([f for f in os.listdir(sub_path) if f.lower().endswith(tuple(config.VIDEO_EXTS))])
-
+                
                 with open(csv_path, 'w', newline='', encoding='utf-8-sig') as f:
                     writer = csv.writer(f)
                     # Write headers
                     writer.writerow([col[0] for col in COLUMNS])
-
+                    
                     for filename in files:
                         file_path = os.path.join(sub_path, filename)
                         meta = get_file_metadata(file_path)
@@ -174,19 +177,19 @@ class YearSelectionDialog(QtWidgets.QDialog):
 
         self.chk_all = QtWidgets.QCheckBox("Seleccionar todos los años")
         layout.addWidget(self.chk_all)
-
+        
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
         container = QtWidgets.QWidget()
         self.scroll_layout = QtWidgets.QVBoxLayout(container)
-
+        
         self.checkboxes = []
         for year in years:
             cb = QtWidgets.QCheckBox(year)
             self.scroll_layout.addWidget(cb)
             self.checkboxes.append(cb)
             cb.toggled.connect(self.update_continue_button)
-
+            
         scroll.setWidget(container)
         layout.addWidget(scroll)
 
@@ -195,14 +198,14 @@ class YearSelectionDialog(QtWidgets.QDialog):
         buttons = QtWidgets.QHBoxLayout()
         self.btn_continue = QtWidgets.QPushButton("Continuar")
         self.btn_cancel = QtWidgets.QPushButton("Cancelar")
-
+        
         self.btn_continue.clicked.connect(self.accept)
         self.btn_cancel.clicked.connect(self.reject)
-
+        
         buttons.addWidget(self.btn_continue)
         buttons.addWidget(self.btn_cancel)
         layout.addLayout(buttons)
-
+        
         self.update_continue_button()
 
     def toggle_all(self, checked):
@@ -226,11 +229,11 @@ class ProgressDialog(QtWidgets.QDialog):
         self.setFixedSize(450, 120)
         self.setModal(True)
         layout = QtWidgets.QVBoxLayout(self)
-
+        
         self.label = QtWidgets.QLabel("Iniciando...")
         self.label.setWordWrap(True)
         layout.addWidget(self.label)
-
+        
         self.bar = QtWidgets.QProgressBar()
         layout.addWidget(self.bar)
 
@@ -242,7 +245,7 @@ class ProgressDialog(QtWidgets.QDialog):
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
-
+    
     # Use dark theme if available
     try:
         import utils
@@ -272,11 +275,11 @@ def main():
                 if name.isdigit() and len(name) == 4 and int(name) >= 2004:
                     if name not in all_years:
                         all_years.append(name)
-
+        
         current_year = datetime.date.today().year
         if str(current_year) not in all_years:
              all_years.append(str(current_year))
-
+             
         # Use set to avoid duplicates and sort
         all_years = sorted(list(set(all_years)))
     except Exception:
@@ -287,12 +290,12 @@ def main():
         return
 
     selected_years = dlg.get_selected_years()
-
+    
     progress = ProgressDialog()
     worker = BackupWorker(selected_years, backup_path)
-
+    
     worker.progress.connect(progress.update_progress)
-
+    
     def on_finished(success, message, tb):
         progress.close()
         msg_box = QtWidgets.QMessageBox()
