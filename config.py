@@ -8,6 +8,8 @@ ID_APP = 'etude_video.FrameEtude.VideoFramesInspector.v2'
 ID_APP_LIRYCS = 'etude_video.LyricManagment.LyricsBook.v2'
 ID_APP_PHASE_GEN = 'etude_video.LyricManagment.PlanMdGen.v1'
 ID_APP_TMP_EP = 'etude_video.LyricManagment.temp_EpList.v1'
+ID_APP_BACKUP = 'etude_video.FrameEtude.BackupMetadata.v1'
+
 
 USER_HOME = Path.home()
 APP_DIR = Path(__file__).resolve().parent.as_posix()
@@ -46,6 +48,7 @@ DEFAULT_SETTINGS = {
     "THUMB_SPACING": 8,
     "CONTROL_WIDTH_ESTIMATE": 240,
     "CACHE_SIZE": 15, # tamaño máximo del cache LRU (afecta rendimiento de CPU/RAM)
+    "BACKUP_PATH": os.environ.get("OneDrive") or (USER_HOME / "Documents").as_posix(),
 }
 
 # Diccionario contenedor interno para evitar usar la palabra clave 'global'
@@ -132,3 +135,4 @@ NUM_THUMBS = int(_C["general"]["NUM_THUMBS"])
 THUMB_SPACING = int(_C["general"]["THUMB_SPACING"])
 CONTROL_WIDTH_ESTIMATE = int(_C["general"]["CONTROL_WIDTH_ESTIMATE"])
 CACHE_SIZE = int(_C["general"]["CACHE_SIZE"])
+BACKUP_PATH = str(_C["general"]["BACKUP_PATH"])
