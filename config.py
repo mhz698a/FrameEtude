@@ -46,6 +46,7 @@ DEFAULT_SETTINGS = {
     "THUMB_SPACING": 8,
     "CONTROL_WIDTH_ESTIMATE": 240,
     "CACHE_SIZE": 15, # tamaño máximo del cache LRU (afecta rendimiento de CPU/RAM)
+    "BACKUP_PATH": "",
 }
 
 # Diccionario contenedor interno para evitar usar la palabra clave 'global'
@@ -132,3 +133,4 @@ NUM_THUMBS = int(_C["general"]["NUM_THUMBS"])
 THUMB_SPACING = int(_C["general"]["THUMB_SPACING"])
 CONTROL_WIDTH_ESTIMATE = int(_C["general"]["CONTROL_WIDTH_ESTIMATE"])
 CACHE_SIZE = int(_C["general"]["CACHE_SIZE"])
+BACKUP_PATH = str(_C["general"]["BACKUP_PATH"])
