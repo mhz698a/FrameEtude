@@ -69,6 +69,12 @@ class FolderSelectorBar(QtWidgets.QListWidget):
             
             rename_action = menu.addAction("Renombrar esta carpeta")
             rename_action.triggered.connect(lambda: self._rename_folder(item))
+
+            copy_name_action = menu.addAction("Copy folder name")
+            copy_name_action.triggered.connect(lambda: QtWidgets.QApplication.clipboard().setText(os.path.basename(path.rstrip("\\/"))))
+
+            copy_path_action = menu.addAction("Copy folder path")
+            copy_path_action.triggered.connect(lambda: QtWidgets.QApplication.clipboard().setText(path))
             
             delete_action = menu.addAction("Eliminar esta carpeta")
             is_empty = self._is_folder_empty_for_delete(path)
