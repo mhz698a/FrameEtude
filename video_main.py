@@ -86,11 +86,32 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.btn_eptmp = QtWidgets.QPushButton("Get Titles Ep")
         self.btn_eptmp.clicked.connect(self.get_episode_titles_temp)
         
-        self.btn_check = QtWidgets.QPushButton("Check")
+        self.btn_check = QtWidgets.QPushButton("Check MD")
+        self.btn_check.setStyleSheet("""
+            QPushButton {
+                background-color: #05478a; 
+                color: white;
+                border-radius: 4px; /* Opcional: bordes ligeramente redondeados */
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: #075cb5; /* Color más claro al pasar el cursor */
+            }
+            QPushButton:pressed {
+                background-color: #032f5c; /* Color más oscuro al hacer clic */
+            }
+        """)
         self.btn_check.clicked.connect(self.open_lyrics_manager)
         self.btn_check.hide()
         
+        self.chk_lyric = QtWidgets.QCheckBox("View Lyrics?")
+        self.chk_lyric.setChecked(False)
+        self.chk_lyric.hide()
+        self.chk_lyric.toggled.connect(self.on_lyric_checkbox_toggled)
+        left_layout.addWidget(self.chk_lyric)
+        
         h1_master.addWidget(self.base_label, 1)
+        h1_master.addWidget(self.chk_lyric)
         h1_master.addWidget(self.btn_settings)
         h1_master.addWidget(self.btn_about)
         h1_master.addWidget(self.btn_rescan)
@@ -108,16 +129,9 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.folder_count_label = QtWidgets.QLabel("0 archivos multimedia detectados en esta carpeta")
         left_layout.addWidget(self.folder_count_label)
         
-        self.chk_lyric = QtWidgets.QCheckBox("Es lirica/Plan.md")
-        self.chk_lyric.setChecked(False)
-        self.chk_lyric.hide()
-        self.chk_lyric.toggled.connect(self.on_lyric_checkbox_toggled)
-        left_layout.addWidget(self.chk_lyric)
-        
         self.file_table = FileTableWidget()
         self.file_table.itemSelectionChanged.connect(self.on_file_selected)
         self.file_table.row_count_changed.connect(self.on_file_count_changed)
-        # left_layout.addWidget(self.file_table, 1)
         
         files_row = QtWidgets.QHBoxLayout()
         files_row.setSpacing(6)
@@ -1086,27 +1100,42 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.main_layout.invalidate()
         self.centralWidget().updateGeometry()
 
-    def update_lyrics_check_button_visibility(self):
+    def _get_valid_lyrics_base_path(self):
         path = self.folder_selector_bar.current_folder_path().strip()
+        
+        # Ignorar rutas vacías o el placeholder de error
+        if not path or path == '(no encontrado)':
+            return None
+
+        # Obtener el directorio base
         base = path if os.path.isdir(path) else os.path.dirname(path)
-        show = bool(base and os.path.basename(base.rstrip("\\/")).lower().endswith("lyrics"))
-        self.btn_check.setVisible(show)
+        if not base:
+            return None
+
+        # Verificar si el nombre de la carpeta termina en los sufijos permitidos
+        folder_name = os.path.basename(base.rstrip("\\/")).lower()
+        
+        if folder_name.endswith(config.VALID_FOLDER_SUFFIXES):
+            return base
+            
+        return None
+
+    def update_lyrics_check_button_visibility(self):
+        is_valid = self._get_valid_lyrics_base_path() is not None
+        self.btn_check.setVisible(is_valid)
 
     def open_lyrics_manager(self):
-        path = self.folder_selector_bar.current_folder_path().strip()
-        if not path or path == '(no encontrado)':
+        base = self._get_valid_lyrics_base_path()
+        if not base:
             return
 
-        base = path if os.path.isdir(path) else os.path.dirname(path)
-        if not os.path.basename(base.rstrip("\\/")).lower().endswith("lyrics"):
-            return
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        script_path = os.path.join(script_dir, "lirycs_mgr.pyw") 
 
-        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lirycs_mgr.pyw")
         if not os.path.exists(script_path):
-            QtWidgets.QMessageBox.critical(self, "Error", f"No se encontró: {script_path}")
+            QtWidgets.QMessageBox.critical(self, "Error", f"No se encontró el archivo:\n{script_path}")
             return
 
-        script_dir = os.path.dirname(script_path)
         pythonw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
         launcher = pythonw if os.path.exists(pythonw) else sys.executable
 
