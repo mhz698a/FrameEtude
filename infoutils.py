@@ -21,14 +21,7 @@ def get_overwrite_data(key_const):
         item = datos.get(key_const)
         if not item:
             return fallback
-<<<<<<< HEAD
             
         return (item.get("id", "?"), item.get("fecha", "?"), item.get("descripcion", "Sin descripción"))
     except Exception:
         return fallback
-=======
-
-        return (item.get("id", "?"), item.get("fecha", "?"), item.get("descripcion", "Sin descripción"))
-    except Exception:
-        return fallback
->>>>>>> 6d69ca555022a827866dcd902fafa804b1dfb681
