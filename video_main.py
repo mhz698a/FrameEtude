@@ -21,10 +21,10 @@ class VideoEtude(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("FrameEtude")
-        screen = QtWidgets.QApplication.primaryScreen().availableGeometry()
-        screen_w = screen.width()
-        screen_h = screen.height()
-        self.setMaximumSize(screen_w, screen_h)
+        # screen = QtWidgets.QApplication.primaryScreen().availableGeometry()
+        # screen_w = screen.width()
+        # screen_h = screen.height()
+        # self.setMaximumSize(screen_w, screen_h)
         self.resize(1300, 620)
 
         # central layout: left panel + right main area
