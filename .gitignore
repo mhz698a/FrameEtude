@@ -1,0 +1,14 @@
+__pycache__/
+__sandbox__/
+*.py[cod]
+*$py.class
+__docs__/
+.vscode/
+*.bat
+*.tmp
+
+*.env
+secret_settings.py
+
+.DS_Store
+Thumbs.db
