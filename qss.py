@@ -2,6 +2,7 @@ QSS_SHEET = """
 QLabel { 
     color: #e6e6e6; 
 }
+
 QPushButton { 
     background-color: #3a3a3c; 
     border: 1px solid #2b2b2d; 
@@ -14,6 +15,13 @@ QPushButton:hover { background-color: #4a4a4c; }
 QPushButton:pressed { background-color: #2e88ff; color: white; }
 QPushButton:disabled { background-color: #2a2a2a; color: #888888; }
 
+QToolButton::menu-button {
+    border-left: 1px solid #3c3c3c;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    width: 16px;
+}
+
 QLineEdit { 
     background-color: #1e1e1f; 
     border: 1px solid #2b2b2d; 
@@ -21,7 +29,9 @@ QLineEdit {
     color: #e6e6e6; 
     border-radius: 4px; 
 }
+
 QCheckBox { color: #e6e6e6; }
+
 QMessageBox {
     background-color: #2b2b2b;
     color: #dddddd;
@@ -42,6 +52,7 @@ QMessageBox QPushButton:hover {
 QMessageBox QPushButton:pressed {
     background-color: #333333;
 }
+
 QComboBox {
     background-color: #1e1e1f;
     border: 1px solid #2b2b2d;

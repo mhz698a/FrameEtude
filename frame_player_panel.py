@@ -17,6 +17,36 @@ class FramePlayerPanel(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(8)
+        
+        self.setStyleSheet("""
+            QPushButton, QToolButton { 
+                background-color: #3a3a3c; 
+                border: 1px solid #2b2b2d; 
+                padding: 6px 10px; 
+                border-radius: 6px; 
+                color: #e6e6e6; 
+            }
+
+            QPushButton:hover, QToolButton::hover { background-color: #4a4a4c; }
+            QPushButton:pressed, QToolButton::pressed { background-color: #2e88ff; color: white; }
+            QPushButton:disabled, QToolButton::disabled { background-color: #2a2a2a; color: #888888; }
+
+            QToolButton::menu-button {
+                border-left: 1px solid #3c3c3c;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+                width: 16px;
+            }
+            
+            QLineEdit { 
+                background-color: #1e1e1f; 
+                border: 1px solid #2b2b2d; 
+                padding: 4px; 
+                color: #e6e6e6; 
+                border-radius: 4px; 
+                qproperty-alignment: 'AlignCenter'; /* <--- Esto centra tanto el texto como el placeholder */
+            }
+        """)
 
         main.right_layout = layout
 
@@ -57,77 +87,103 @@ class FramePlayerPanel(QtWidgets.QWidget):
         main.video_slider.valueChanged.connect(main.on_slider_value_changed)
         layout.addWidget(main.video_slider)
 
-        controls_nav = QtWidgets.QHBoxLayout()
+        # Layout único para todos los controles en una sola línea horizontal
+        controls_layout = QtWidgets.QHBoxLayout()
+        controls_layout.setSpacing(6)
 
-        btn_fc = QtWidgets.QPushButton("Fc")
-        btn_fc.clicked.connect(main.copy_frame_dib)
-        controls_nav.addWidget(btn_fc)
+        # Checkboxes lógicos requeridos por la ventana principal por compatibilidad
+        if not hasattr(main, "check_adjacent") or main.check_adjacent is None:
+            main.check_adjacent = QtWidgets.QCheckBox()
+            main.check_adjacent.hide()
+            main.check_adjacent.setChecked(False)
 
-        for txt, func in [
-            ("-90", lambda: main.move_seconds(-90)),
-            ("-60", lambda: main.move_seconds(-60)),
-            ("-30", lambda: main.move_seconds(-30)),
-            ("-01", lambda: main.move_seconds(-1)),
-            ("-Fr1", lambda: main.move_frame(-1)),
-        ]:
-            b = QtWidgets.QPushButton(txt)
-            b.clicked.connect(func)
-            controls_nav.addWidget(b)
+        if not hasattr(main, "check_curtain") or main.check_curtain is None:
+            main.check_curtain = QtWidgets.QCheckBox()
+            main.check_curtain.hide()
+            main.check_curtain.setChecked(True)
 
+        if not hasattr(main, "check_always_on_top") or main.check_always_on_top is None:
+            main.check_always_on_top = QtWidgets.QCheckBox()
+            main.check_always_on_top.hide()
+            main.check_always_on_top.setChecked(False)
+
+        # Botón de opciones (QToolButton para soportar menú instantáneo)
+        btn_options = QtWidgets.QToolButton()
+        btn_options.setText("Opciones")
+        btn_options.setPopupMode(QtWidgets.QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu_options = QtWidgets.QMenu(btn_options)
+        
+        menu_options.addAction("Copy Frame to Clipboard", main.copy_frame_dib)
+        menu_options.addAction("Copy Timestamp", main.copy_time_to_clipboard)
+        menu_options.addAction("Extract Frame", main.export_frame_png)
+        menu_options.addAction("CCR", main.activate_ocr_selection)
+        menu_options.addAction("Cut", main.show_cut_dialog)
+        
+        menu_options.addSeparator()
+
+        action_adj = menu_options.addAction("Mostrar adyacentes")
+        action_adj.setCheckable(True)
+        action_adj.setChecked(main.check_adjacent.isChecked())
+        action_adj.toggled.connect(lambda checked: (main.check_adjacent.setChecked(checked), main.update_thumbs_visibility()))
+
+        action_curt = menu_options.addAction("Hide")
+        action_curt.setCheckable(True)
+        action_curt.setChecked(main.check_curtain.isChecked())
+        action_curt.toggled.connect(lambda checked: (main.check_curtain.setChecked(checked), main.update_curtain_visibility()))
+
+        action_top = menu_options.addAction("Always on top")
+        action_top.setCheckable(True)
+        action_top.setChecked(main.check_always_on_top.isChecked())
+        action_top.toggled.connect(lambda checked: (main.check_always_on_top.setChecked(checked), main.update_always_on_top(checked)))
+
+        btn_options.setMenu(menu_options)
+        controls_layout.addWidget(btn_options)
+
+        # Botón unificado -01s con menú desplegable lateral para saltos largos
+        btn_neg = QtWidgets.QToolButton()
+        btn_neg.setText("-01s")
+        btn_neg.setPopupMode(QtWidgets.QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+        btn_neg.clicked.connect(lambda: main.move_seconds(-1))
+        
+        menu_neg = QtWidgets.QMenu(btn_neg)
+        menu_neg.addAction("-90s", lambda: main.move_seconds(-90))
+        menu_neg.addAction("-60s", lambda: main.move_seconds(-60))
+        menu_neg.addAction("-30s", lambda: main.move_seconds(-30))
+        btn_neg.setMenu(menu_neg)
+        controls_layout.addWidget(btn_neg)
+
+        # Botón -Fr1
+        btn_minus_fr1 = QtWidgets.QPushButton("-Fr1")
+        btn_minus_fr1.clicked.connect(lambda: main.move_frame(-1))
+        controls_layout.addWidget(btn_minus_fr1)
+
+        # Campo de tiempo con placeholder
         main.entry_time = QtWidgets.QLineEdit()
-        main.entry_time.setFixedWidth(140)
+        main.entry_time.setFixedWidth(120)
+        main.entry_time.setPlaceholderText("hh:mm:ss:ff")
         main.entry_time.returnPressed.connect(main.go_to_time)
-        controls_nav.addWidget(main.entry_time)
+        controls_layout.addWidget(main.entry_time)
 
-        for txt, func in [
-            ("+Fr1", lambda: main.move_frame(1)),
-            ("+01", lambda: main.move_seconds(1)),
-            ("+30", lambda: main.move_seconds(30)),
-            ("+60", lambda: main.move_seconds(60)),
-            ("+90", lambda: main.move_seconds(90)),
-        ]:
-            b = QtWidgets.QPushButton(txt)
-            b.clicked.connect(func)
-            controls_nav.addWidget(b)
+        # Botón +Fr1
+        btn_plus_fr1 = QtWidgets.QPushButton("+Fr1")
+        btn_plus_fr1.clicked.connect(lambda: main.move_frame(1))
+        controls_layout.addWidget(btn_plus_fr1)
 
-        layout.addLayout(controls_nav)
+        # Botón unificado +01s con menú desplegable lateral para saltos largos
+        btn_pos = QtWidgets.QToolButton()
+        btn_pos.setText("+01s")
+        btn_pos.setPopupMode(QtWidgets.QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+        btn_pos.clicked.connect(lambda: main.move_seconds(1))
+        
+        menu_pos = QtWidgets.QMenu(btn_pos)
+        menu_pos.addAction("+30s", lambda: main.move_seconds(30))
+        menu_pos.addAction("+60s", lambda: main.move_seconds(60))
+        menu_pos.addAction("+90s", lambda: main.move_seconds(90))
+        btn_pos.setMenu(menu_pos)
+        controls_layout.addWidget(btn_pos)
 
-        controls_actions = QtWidgets.QHBoxLayout()
-
-        btn_copy_time = QtWidgets.QPushButton("Copy Timestamp")
-        btn_copy_time.clicked.connect(main.copy_time_to_clipboard)
-        controls_actions.addWidget(btn_copy_time)
-
-        btn_export = QtWidgets.QPushButton("Extract Frame")
-        btn_export.clicked.connect(main.export_frame_png)
-        controls_actions.addWidget(btn_export)
-
-        btn_ccr = QtWidgets.QPushButton("CCR")
-        btn_ccr.clicked.connect(main.activate_ocr_selection)
-        controls_actions.addWidget(btn_ccr)
-
-        btn_cut_main = QtWidgets.QPushButton("Cut")
-        btn_cut_main.clicked.connect(main.show_cut_dialog)
-        controls_actions.addWidget(btn_cut_main)
-
-        main.check_adjacent = QtWidgets.QCheckBox("Mostrar adyacentes")
-        main.check_adjacent.setChecked(False)
-        main.check_adjacent.hide()
-        main.check_adjacent.stateChanged.connect(main.update_thumbs_visibility)
-        controls_actions.addWidget(main.check_adjacent)
-
-        main.check_curtain = QtWidgets.QCheckBox("Hide")
-        main.check_curtain.setChecked(False)
-        main.check_curtain.stateChanged.connect(main.update_curtain_visibility)
-        controls_actions.addWidget(main.check_curtain)
-
-        main.check_always_on_top = QtWidgets.QCheckBox("Always on top")
-        main.check_always_on_top.setChecked(False)
-        main.check_always_on_top.stateChanged.connect(main.update_always_on_top)
-        controls_actions.addWidget(main.check_always_on_top)
-
-        controls_actions.addStretch(1)
-        layout.addLayout(controls_actions)
+        controls_layout.addStretch(1)
+        layout.addLayout(controls_layout)
 
         main.status = QtWidgets.QLabel("")
         layout.addWidget(main.status)
