@@ -15,16 +15,14 @@ from lyric_vision_panel import LyricVisionPanel
 from about_season_dialog import AboutSeasonDialog
 from year_selector_bar import YearSelectorBar
 from folder_selector_bar import FolderSelectorBar
+from master_toolbar import MasterToolBar
 import year_creator
 
 class VideoEtude(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
+        self.lyric_mode = False
         self.setWindowTitle("FrameEtude")
-        # screen = QtWidgets.QApplication.primaryScreen().availableGeometry()
-        # screen_w = screen.width()
-        # screen_h = screen.height()
-        # self.setMaximumSize(screen_w, screen_h)
         self.resize(1300, 620)
 
         # central layout: left panel + right main area
@@ -32,16 +30,26 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.setCentralWidget(w)
         self.main_layout = QtWidgets.QHBoxLayout(w)
         self.main_layout.setContentsMargins(8,8,8,8)
-        self.main_layout.setSpacing(8)
+        self.main_layout.setSpacing(0)
+        
+        self.splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
+        self.splitter.setHandleWidth(6)
+        self.splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #2b2b2b;
+            }
+            QSplitter::handle:hover {
+                background-color: #05478a;
+            }
+        """)
+        self.main_layout.addWidget(self.splitter)
 
         # ---------------- Left panel ----------------
         self.left_panel = QtWidgets.QWidget()
-        self.left_panel.setFixedWidth(660)
+        self.left_panel.setMinimumWidth(400)
         left_layout = QtWidgets.QVBoxLayout(self.left_panel)
         left_layout.setContentsMargins(4,4,4,4)
         left_layout.setSpacing(6)
-        
-        h1_master = QtWidgets.QHBoxLayout()
         
         self.combo_year = QtWidgets.QComboBox()
         self.combo_year.setFixedWidth(60)
@@ -59,79 +67,49 @@ class VideoEtude(QtWidgets.QMainWindow):
             lambda: self.on_year_changed(self.combo_year.currentIndex())
         )
         
-        h2_master = QtWidgets.QHBoxLayout()
-        self.base_label = QtWidgets.QLabel('<b>E:\\_Internal\\...\\___[...]\\...\\...</b>')
+        # -------------------------------------
+             
+        self.master_toolbar = MasterToolBar(self)
+                
+        self.master_toolbar.add_simplified_action("Hide/Show Workframe", self.toggle_workframe_visibility)
+        self.master_toolbar.add_simplified_action("Settings", self.open_settings_dialog)
+        self.master_toolbar.add_simplified_action("Open other video", self.open_video_dialog)
+        self.master_toolbar.add_simplified_action("Refresh", self.rescan_current_master_folder)
+        self.master_toolbar.add_simplified_action("Backup", self.run_backup_csv)
+        self.master_toolbar.add_simplified_action("Etude", self.open_etude_file)
+        self.master_toolbar.add_dropdown_button(
+            "Get Ov Reg",
+            [
+                ("Get Ov1 Reg", lambda: self.get_reg_ov_temp("1")),
+                ("Get Ov2 Reg", lambda: self.get_reg_ov_temp("2")),
+            ]
+        )
+        self.master_toolbar.add_simplified_action("Get Titles Ep", self.get_episode_titles_temp)
+        self.master_toolbar.add_simplified_action("Gen Plan.md", self.phase_gen_exec)
+        self.btn_check = self.master_toolbar.add_simplified_action(
+            "Check MD", self.open_lyrics_manager, object_name="CheckMDButton", enabled=False
+        )
+        self.master_toolbar.add_dropdown_button(
+            "Overwrite",
+            [
+                ("Overwrite P", lambda: self.showOverwriteInfo("ov_0")),
+                ("Overwrite I", lambda: self.showOverwriteInfo("ov_1")),
+                ("Overwrite II", lambda: self.showOverwriteInfo("ov_2")),
+                ("Overwrite III", lambda: self.showOverwriteInfo("ov_3")),
+            ]
+        )
+        self.action_load_selected = self.master_toolbar.add_simplified_action(
+            "Load to Workframe", self.load_selected_file, enabled=False
+        )
+        self.master_toolbar.add_simplified_action("Check SMB", self.open_smb_dialog)
+        self.master_toolbar.add_simplified_action("About", self.open_about_dialog)
+        self.chk_lyric = self.master_toolbar.add_simplified_action(
+            "View Lyrics?", self.on_lyric_checkbox_toggled, checkable=True, enabled=False
+        )
         
-        self.btn_settings = QtWidgets.QPushButton("Settings")
-        self.btn_settings.clicked.connect(self.open_settings_dialog)
+        left_layout.addWidget(self.master_toolbar)
         
-        self.btn_about = QtWidgets.QPushButton("About")
-        self.btn_about.clicked.connect(self.open_about_dialog)
-        
-        self.btn_rescan = QtWidgets.QPushButton("Refresh This folder")
-        self.btn_rescan.clicked.connect(self.rescan_current_master_folder)
-        
-        self.btn_backup = QtWidgets.QPushButton("Backup")
-        self.btn_backup.clicked.connect(self.run_backup_csv)
-        
-        self.btn_phasegen = QtWidgets.QPushButton("Gen Plan.md")
-        self.btn_phasegen.clicked.connect(self.phase_gen_exec)
-        
-        self.btn_etude = QtWidgets.QPushButton("Etude")
-        self.btn_etude.clicked.connect(self.open_etude_file)
-        
-        self.btn_ovreg1 = QtWidgets.QPushButton("Get Ov1 Reg")
-        self.btn_ovreg1.clicked.connect(lambda: self.get_reg_ov_temp("1"))
-        
-        self.btn_ovreg2 = QtWidgets.QPushButton("Get Ov2 Reg")
-        self.btn_ovreg2.clicked.connect(lambda: self.get_reg_ov_temp("2"))
-        
-        self.btn_eptmp = QtWidgets.QPushButton("Get Titles Ep")
-        self.btn_eptmp.clicked.connect(self.get_episode_titles_temp)
-        
-        self.btn_check = QtWidgets.QPushButton("Check MD")
-        self.btn_check.setStyleSheet("""
-            QPushButton {
-                background-color: #05478a; 
-                color: white;
-                border-radius: 4px; /* Opcional: bordes ligeramente redondeados */
-                padding: 5px;
-            }
-            QPushButton:hover {
-                background-color: #075cb5; /* Color más claro al pasar el cursor */
-            }
-            QPushButton:pressed {
-                background-color: #032f5c; /* Color más oscuro al hacer clic */
-            }
-        """)
-        self.btn_check.clicked.connect(self.open_lyrics_manager)
-        self.btn_check.hide()
-        
-        self.chk_lyric = QtWidgets.QCheckBox("View Lyrics?")
-        self.chk_lyric.setChecked(False)
-        self.chk_lyric.hide()
-        self.chk_lyric.toggled.connect(self.on_lyric_checkbox_toggled)
-        left_layout.addWidget(self.chk_lyric)
-        
-        h1_master.addWidget(self.base_label, 1)
-        h1_master.addWidget(self.chk_lyric)
-        h1_master.addWidget(self.btn_settings)
-        h1_master.addWidget(self.btn_about)
-        h1_master.addWidget(self.btn_rescan)
-        
-        h2_master.addWidget(self.btn_backup)
-        h2_master.addWidget(self.btn_phasegen)
-        h2_master.addWidget(self.btn_etude)
-        h2_master.addWidget(self.btn_ovreg1)
-        h2_master.addWidget(self.btn_ovreg2)        
-        h2_master.addWidget(self.btn_eptmp)
-        h2_master.addWidget(self.btn_check)
-        
-        left_layout.addLayout(h1_master)
-        left_layout.addLayout(h2_master)
-        
-        self.folder_count_label = QtWidgets.QLabel("0 archivos multimedia detectados en esta carpeta")
-        left_layout.addWidget(self.folder_count_label)
+        # ---------------------------------------
         
         self.file_table = FileTableWidget()
         self.file_table.itemSelectionChanged.connect(self.on_file_selected)
@@ -145,56 +123,39 @@ class VideoEtude(QtWidgets.QMainWindow):
         files_row.addWidget(self.file_table, 1)
         left_layout.addLayout(files_row, 1)
         
+        # ---------------- Fila única de Progreso y Conteo ----------------
+        
+        progress_row = QtWidgets.QHBoxLayout()
+        progress_row.setContentsMargins(5, 5, 5, 5)
+        progress_row.setSpacing(8)
+        
+        self.folder_count_label = QtWidgets.QLabel("0 MediaFiles")
+        self.folder_count_label.setStyleSheet("""
+            color: white;
+            background: #4f4f4f;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-style: italic;
+        """)
+        progress_row.addWidget(self.folder_count_label)
+        
         self.metadata_progress_label = QtWidgets.QLabel("0/0")
-        left_layout.addWidget(self.metadata_progress_label)
+        progress_row.addWidget(self.metadata_progress_label)
 
         self.metadata_progress_bar = QtWidgets.QProgressBar()
         self.metadata_progress_bar.setRange(0, 100)
         self.metadata_progress_bar.setValue(0)
-        left_layout.addWidget(self.metadata_progress_bar)
+        progress_row.addWidget(self.metadata_progress_bar, 1)
+        
+        left_layout.addLayout(progress_row)
         
         self.file_table.set_progress_widgets(
             self.metadata_progress_bar,
             self.metadata_progress_label,
         )
-        
-        overwrite_btns = QtWidgets.QHBoxLayout()
-        botones_config = [
-            ('Overwrite P', "ov_0"),
-            ('Overwrite I', "ov_1"),
-            ('Overwrite II', "ov_2"),
-            ('Overwrite III', "ov_3")
-        ]
-
-        for texto, key in botones_config:
-            btn = QtWidgets.QPushButton(texto)
-            btn.clicked.connect(lambda checked, k=key: self.showOverwriteInfo(k))
-            overwrite_btns.addWidget(btn)
-
-        left_layout.addLayout(overwrite_btns)
-        
-        btns_left = QtWidgets.QHBoxLayout()
-        self.btn_load_selected = QtWidgets.QPushButton('Load Selected')
-        self.btn_load_selected.clicked.connect(self.load_selected_file)
-        self.btn_load_selected.setEnabled(False)
-        btns_left.addWidget(self.btn_load_selected)
-                
-        self.btn_open_file = QtWidgets.QPushButton('Open other video')
-        self.btn_open_file.clicked.connect(self.open_video_dialog)
-        btns_left.addWidget(self.btn_open_file)
-        
-        self.btn_check_smb = QtWidgets.QPushButton('Check SMB')
-        self.btn_check_smb.clicked.connect(self.open_smb_dialog)
-        btns_left.addWidget(self.btn_check_smb)
-        
-        self.btn_toggle_workframe = QtWidgets.QPushButton('Hide/Show Workframe')
-        self.btn_toggle_workframe.clicked.connect(self.toggle_workframe_visibility)
-        btns_left.addWidget(self.btn_toggle_workframe)
-        
-        left_layout.addLayout(btns_left)
-        self.main_layout.addWidget(self.left_panel, 0)
-
+    
         # ---------------- Right main area ----------------
+        
         self.right_widget = QtWidgets.QWidget()
         self.right_stack = QtWidgets.QStackedLayout(self.right_widget)
 
@@ -204,9 +165,10 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.right_stack.addWidget(self.frame_player_panel)
         self.right_stack.addWidget(self.lyric_panel)
         self.right_stack.setCurrentWidget(self.frame_player_panel)
-
-        self.main_layout.addWidget(self.right_widget, 1)
-        self.lyric_mode = False
+        
+        self.splitter.addWidget(self.left_panel)
+        self.splitter.addWidget(self.right_widget)
+        self.splitter.setSizes([660, 640])
 
         # ----------------- video state ----------------------
         self.cap = None
@@ -341,9 +303,9 @@ class VideoEtude(QtWidgets.QMainWindow):
         
     def load_year_data(self, year: str):
         self.exit_lyric_mode(uncheck=True)
-        self.chk_lyric.hide()
+        self.chk_lyric.setEnabled(False)
         self.folder_selector_bar.set_folders([])
-        self.btn_check.hide()
+        self.btn_check.setEnabled(False)
         
         if not year or year == "(no encontrado)":
             return
@@ -388,7 +350,7 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         if not path or path == '(no encontrado)':
             self.file_table.load_folder("")
-            self.btn_load_selected.setEnabled(False)
+            self.action_load_selected.setEnabled(False)
             self._sync_lyric_checkbox_for_folder("")
             return
 
@@ -397,7 +359,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             base = os.path.dirname(path)
 
         self.file_table.load_folder(base)
-        self.btn_load_selected.setEnabled(False)
+        self.action_load_selected.setEnabled(False)
         self._sync_lyric_checkbox_for_folder(base)
 
     def rescan_current_master_folder(self):
@@ -473,8 +435,8 @@ class VideoEtude(QtWidgets.QMainWindow):
 
     def on_file_selected(self):
         has_file = bool(self.file_table.current_file_path())
-        self.btn_load_selected.setEnabled(has_file)
-        
+        self.action_load_selected.setEnabled(has_file)
+
         if self.lyric_mode and has_file:
             self.load_current_lyric_entry()
         
@@ -1075,28 +1037,22 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.toggle_workframe_visibility()
 
     def toggle_workframe_visibility(self):
-        self.right_widget.setVisible(not self.right_widget.isVisible())
-        self._set_workframe_visible(self.right_widget.isVisible())
+        visible = not self.right_widget.isVisible()
+        self.right_widget.setVisible(visible)
+        self._set_workframe_visible(visible)
 
     def _set_workframe_visible(self, visible: bool):
-        
+        self.right_widget.setVisible(visible)
         if visible:
-            self.left_panel.setFixedWidth(550)
-            self.left_panel.setSizePolicy(
-                QtWidgets.QSizePolicy.Policy.Fixed,
-                QtWidgets.QSizePolicy.Policy.Preferred,
-            )
-            self.main_layout.setStretch(0, 0)
-            self.main_layout.setStretch(1, 1)
-        else:
-            self.left_panel.setMinimumWidth(0)
-            self.left_panel.setMaximumWidth(16777215)
-            self.left_panel.setSizePolicy(
-                QtWidgets.QSizePolicy.Policy.Expanding,
-                QtWidgets.QSizePolicy.Policy.Preferred,
-            )
-            self.main_layout.setStretch(0, 1)
-            self.main_layout.setStretch(1, 0)
+            total_w = self.splitter.width()
+            if total_w > 700:
+                self.splitter.setSizes([660, total_w - 660])
+            else:
+                self.splitter.setSizes([660, 640])
+        
+        self.left_panel.updateGeometry()
+        self.right_widget.updateGeometry()
+        self.splitter.updateGeometry()
             
 
         self.left_panel.updateGeometry()
@@ -1126,7 +1082,7 @@ class VideoEtude(QtWidgets.QMainWindow):
 
     def update_lyrics_check_button_visibility(self):
         is_valid = self._get_valid_lyrics_base_path() is not None
-        self.btn_check.setVisible(is_valid)
+        self.btn_check.setEnabled(is_valid)
 
     def open_lyrics_manager(self):
         base = self._get_valid_lyrics_base_path()
@@ -1162,7 +1118,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         dialog.exec()
 
     def on_file_count_changed(self, count):
-        self.folder_count_label.setText(f"{count} archivos multimedia detectados en esta carpeta")
+        self.folder_count_label.setText(f"{count} MediaFiles")
 
     def _current_master_folder(self) -> str:
         path = self.folder_selector_bar.current_folder_path().strip()
@@ -1183,10 +1139,10 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.chk_lyric.blockSignals(True)
             self.chk_lyric.setChecked(False)
             self.chk_lyric.blockSignals(False)
-            self.chk_lyric.hide()
+            self.chk_lyric.setEnabled(False)
             return
 
-        self.chk_lyric.show()
+        self.chk_lyric.setEnabled(True)
 
     def on_lyric_checkbox_toggled(self, checked: bool):
         if checked:

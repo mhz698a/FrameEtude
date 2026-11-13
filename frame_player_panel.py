@@ -15,12 +15,13 @@ class FramePlayerPanel(QtWidgets.QWidget):
     def _build(self):
         main = self.main
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(8)
 
         main.right_layout = layout
 
         main.info_label = QtWidgets.QLabel("Nombre - Duración")
+        main.info_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(main.info_label)
 
         main.thumb_container = QtWidgets.QWidget()

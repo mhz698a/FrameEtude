@@ -53,6 +53,8 @@ class AboutSeasonDialog(QtWidgets.QDialog):
             root.addWidget(msg)
 
             footer = QtWidgets.QHBoxLayout()
+            path_base_lbl = QtWidgets.QLabel('<b>E:\\_Internal\\...\\___[...]\\...\\...</b>')
+            footer.addWidget(path_base_lbl)
             footer.addStretch(1)
             btn_close = QtWidgets.QPushButton("Close")
             btn_close.clicked.connect(self.accept)
@@ -69,6 +71,8 @@ class AboutSeasonDialog(QtWidgets.QDialog):
             root.addWidget(tabs, 1)
 
         footer = QtWidgets.QHBoxLayout()
+        path_base_lbl = QtWidgets.QLabel('<b>E:\\_Internal\\...\\___[...]\\...\\...</b>')
+        footer.addWidget(path_base_lbl)
         footer.addStretch(1)
         btn_close = QtWidgets.QPushButton("Close")
         btn_close.clicked.connect(self.accept)
