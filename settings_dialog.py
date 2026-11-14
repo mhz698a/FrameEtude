@@ -64,7 +64,11 @@ class SettingsDialog(QtWidgets.QDialog):
         # --- General Tab ---
         self.gen_tab = QtWidgets.QWidget()
         self.gen_layout = QtWidgets.QFormLayout(self.gen_tab)
-        
+
+        self.start_with_curtain = QtWidgets.QCheckBox()
+        self.start_with_curtain.setChecked(config.START_WITH_CURTAIN)
+        self.gen_layout.addRow("Start with curtain:", self.start_with_curtain)
+
         self.cache_size = QtWidgets.QSpinBox()
         self.cache_size.setRange(1, 100)
         self.cache_size.setValue(config.CACHE_SIZE)
@@ -201,6 +205,7 @@ class SettingsDialog(QtWidgets.QDialog):
         
         # Empaquetar datos generales
         new_general = {
+            "START_WITH_CURTAIN": self.start_with_curtain.isChecked(),
             "CACHE_SIZE": int(self.cache_size.value()),
             "CONTROL_WIDTH_ESTIMATE": int(self.control_width.value()),
             "RENAME_DIALOG_SCRIPT": str(self.rename_script.text()),
