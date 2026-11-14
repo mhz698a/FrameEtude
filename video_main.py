@@ -563,34 +563,14 @@ class VideoEtude(QtWidgets.QMainWindow):
 
     # ---------------- Single-frame layout & curtain ----------------
     def update_curtain_geometry(self):
-        if not hasattr(self, "curtain") or not hasattr(self, "frame_canvas"):
+        if not hasattr(self, "frame_canvas"):
             return
-
-        image_rect = self.frame_canvas.displayed_image_rect()
-        if image_rect.isEmpty():
-            self.curtain.hide()
-            return
-
-        # Align the curtain with the rendered image, excluding the canvas letterboxing.
-        image_origin = self.frame_canvas.mapTo(
-            self.frame_viewport,
-            image_rect.topLeft(),
-        )
-        self.curtain.set_geometry_height(
-            image_origin.x(),
-            image_origin.y(),
-            image_rect.width(),
-            image_rect.height(),
-        )
-
-        if self.check_curtain.isChecked():
-            self.curtain.show()
-            self.curtain.raise_()
-        else:
-            self.curtain.hide()
+        self.frame_canvas.update_curtain_geometry()
 
     def update_curtain_visibility(self):
-        self.update_curtain_geometry()
+        if hasattr(self, "frame_canvas") and hasattr(self, "check_curtain"):
+            self.frame_canvas.set_curtain_enabled(self.check_curtain.isChecked())
+            self.update_curtain_geometry()
 
     # ---------------- Navigation ----------------
     def show_frames(self, frame_num):

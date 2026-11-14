@@ -32,7 +32,15 @@ class FrameCanvas(QtWidgets.QWidget):
             QtWidgets.QSizePolicy.Policy.Expanding,
         )
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet("background-color: rgb(18,18,18); border: none;")
+        self.setStyleSheet("background-color: black; border: none;")
+        
+        # Estado de la cortina
+        self.curtain_enabled = False
+        self.curtain_top = 0
+        self.curtain_bottom = 0
+        self.min_curtain_height = 10
+        self.dragging_curtain = None
+        self.setMouseTracking(True)
 
     def set_frame_image(self, image):
         self._frame_image = image.copy() if image is not None else QtGui.QImage()
@@ -64,8 +72,29 @@ class FrameCanvas(QtWidgets.QWidget):
             scaled_size.height(),
         )
 
+    def set_curtain_enabled(self, enabled: bool):
+        self.curtain_enabled = enabled
+        self.update()
+
+    def update_curtain_geometry(self):
+        target = self.displayed_image_rect()
+        if target.isEmpty():
+            return
+        h = target.height()
+        if h <= 0:
+            return
+        if self.curtain_bottom <= 0:
+            default_height = min(150, h // 2)
+            self.curtain_top = (h - default_height) // 2
+            self.curtain_bottom = self.curtain_top + default_height
+        
+        self.curtain_top = max(0, min(self.curtain_top, h - self.min_curtain_height))
+        self.curtain_bottom = max(self.curtain_top + self.min_curtain_height, min(self.curtain_bottom, h))
+        self.update()
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        self.update_curtain_geometry()
         viewport = self.parentWidget()
         main_window = getattr(viewport, "main", None)
         if main_window is not None:
@@ -89,6 +118,74 @@ class FrameCanvas(QtWidgets.QWidget):
 
         painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
         painter.drawImage(target, self._frame_image)
+
+        # Dibujar cortina integrada si está activa
+        if self.curtain_enabled:
+            h = target.height()
+            if h > 0 and self.curtain_bottom > self.curtain_top:
+                painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+                
+                curtain_rect = QtCore.QRect(
+                    target.x(),
+                    target.y() + self.curtain_top,
+                    target.width(),
+                    self.curtain_bottom - self.curtain_top
+                )
+                
+                # Color de la cortina (Negro sólido u opaco)
+                painter.fillRect(curtain_rect, QtGui.QColor(0, 0, 0, 255))
+                
+                # Líneas divisorias superior e inferior de la cortina
+                pen = QtGui.QPen(QtGui.QColor(140, 140, 140, 220))
+                pen.setWidth(2)
+                painter.setPen(pen)
+                painter.drawLine(target.x(), target.y() + self.curtain_top, target.x() + target.width(), target.y() + self.curtain_top)
+                painter.drawLine(target.x(), target.y() + self.curtain_bottom, target.x() + target.width(), target.y() + self.curtain_bottom)
+
+    def mousePressEvent(self, event):
+        if not self.curtain_enabled:
+            super().mousePressEvent(event)
+            return
+        
+        target = self.displayed_image_rect()
+        if target.isEmpty():
+            return
+        
+        y_local = event.position().y() - target.y()
+        if abs(y_local - self.curtain_top) < 10:
+            self.dragging_curtain = 'top'
+        elif abs(y_local - self.curtain_bottom) < 10:
+            self.dragging_curtain = 'bottom'
+        else:
+            self.dragging_curtain = None
+
+    def mouseMoveEvent(self, event):
+        if not self.curtain_enabled:
+            super().mouseMoveEvent(event)
+            return
+        
+        target = self.displayed_image_rect()
+        if target.isEmpty():
+            return
+        
+        y_local = event.position().y() - target.y()
+        h = target.height()
+        
+        if self.dragging_curtain == 'top':
+            self.curtain_top = max(0, min(self.curtain_bottom - self.min_curtain_height, int(y_local)))
+            self.update()
+        elif self.dragging_curtain == 'bottom':
+            self.curtain_bottom = min(h, max(self.curtain_top + self.min_curtain_height, int(y_local)))
+            self.update()
+        else:
+            if abs(y_local - self.curtain_top) < 20 or abs(y_local - self.curtain_bottom) < 20:
+                self.setCursor(QtCore.Qt.CursorShape.SizeVerCursor)
+            else:
+                self.setCursor(QtCore.Qt.CursorShape.ArrowCursor)
+
+    def mouseReleaseEvent(self, event):
+        self.dragging_curtain = None
+        super().mouseReleaseEvent(event)
 
 
 class FramePlayerPanel(QtWidgets.QWidget):
@@ -141,21 +238,20 @@ class FramePlayerPanel(QtWidgets.QWidget):
         video_box_layout.setSpacing(0)
 
         # Etiqueta de nombre y duración con fondo negro y texto blanco
-        main.info_label = QtWidgets.QLabel("Nombre - Duración")
+        main.info_label = QtWidgets.QLabel("FrameEtude - 00:00:00.000")
         main.info_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         main.info_label.setStyleSheet("""
             background-color: black;
             color: white;
             padding: 6px;
             font-weight: bold;
-            border: 1px solid #2b2b2b;
-            border-bottom: none;
+            border: none;
         """)
         video_box_layout.addWidget(main.info_label)
 
         main.frame_viewport = FrameViewport(main)
         main.frame_viewport.setStyleSheet(
-            "background-color: rgb(18,18,18); border: none;"
+            "background-color: black; border: none;"
         )
         main.frame_layout = QtWidgets.QHBoxLayout(main.frame_viewport)
         main.frame_layout.setContentsMargins(0, 0, 0, 0)
