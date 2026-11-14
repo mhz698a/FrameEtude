@@ -951,7 +951,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.critical(
                 self,
                 "Rename dialog",
-                f"No se pudo abrir el editor de nombre y metadatos.\\n\\n{e}",
+                f"No se pudo abrir el editor de nombre y metadatos.\n\n{e}",
             )
 
     def edit_selected_metadata(self):
