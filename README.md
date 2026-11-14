@@ -126,6 +126,8 @@ FrameEtude/
 ├── smb_dialog.py                 # Diálogo de acceso SMB
 ├── windows_share_manager.py      # Gestor de comparticiones Windows
 ├── metadata_edit_lib.py           # Edición de metadatos
+├── rename_dialog.py                # Editor integrado de nombre y etiquetas
+├── pyrenameutils/                  # Utilidades de etiquetas, carátulas y Windows
 ├── lyric_vision_panel.py          # Panel de visualización de letras
 ├── settings_dialog.py             # Diálogo de configuración
 ├── vidwk_lib.py                   # Utilidades de trabajo con video
