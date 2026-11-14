@@ -95,7 +95,7 @@ class VideoEtude(QtWidgets.QMainWindow):
                 ("Overwrite II", lambda: self.showOverwriteInfo("ov_2")),
                 ("Overwrite III", lambda: self.showOverwriteInfo("ov_3")),
                 ("Anachronic Overwrite", lambda: self.showOverwriteInfo(
-                    "ov_0", database_path=config.A_OVERWRITE_DATABASE,
+                    "anachronic_overwriting", database_path=config.A_OVERWRITE_DATABASE,
                     label="Anachronic Overwrite",
                 )),
             ]
