@@ -104,6 +104,7 @@ OCR_LANG = 'spa'           # Idioma (esp, eng, etc.)
 [general]
 BASE_INTERNAL_ROOT = "E:\_Internal"
 CACHE_SIZE = 15
+START_WITH_CURTAIN = true  # Activate the curtain when FrameEtude starts
 ```
 
 ## 📁 Estructura del Proyecto
