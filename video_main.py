@@ -11,6 +11,7 @@ import config
 from utils import *
 from infoutils import get_overwrite_data
 from frame_player_panel import FramePlayerPanel
+from rename_dialog import RenameDialog
 from lyric_vision_panel import LyricVisionPanel
 from about_season_dialog import AboutSeasonDialog
 from year_selector_bar import YearSelectorBar
@@ -932,12 +933,32 @@ class VideoEtude(QtWidgets.QMainWindow):
         dlg.show()
 
     
+    def open_rename_dialog(self, video_path: str):
+        if not video_path or not os.path.isfile(video_path):
+            return
+
+        try:
+            self._rename_dialog = RenameDialog(video_path, self)
+            self._rename_dialog.setWindowFlag(
+                QtCore.Qt.WindowType.Window, True
+            )
+            if config.ICON_PATH and os.path.isfile(config.ICON_PATH):
+                self._rename_dialog.setWindowIcon(QtGui.QIcon(config.ICON_PATH))
+            self._rename_dialog.show()
+            self._rename_dialog.raise_()
+            self._rename_dialog.activateWindow()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Rename dialog",
+                f"No se pudo abrir el editor de nombre y metadatos.\\n\\n{e}",
+            )
+
     def edit_selected_metadata(self):
         video_path = self.file_table.current_file_path()
         if not video_path:
             return
-
-        self.file_table.launch_rename_dialog(video_path)
+        self.open_rename_dialog(video_path)
 
     def ensure_workframe_visible(self):
         if not self.right_widget.isVisible():
