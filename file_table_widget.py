@@ -1,4 +1,4 @@
-import os, datetime, subprocess, re
+import os, datetime, subprocess, re, sys
 import functools
 from ctypes import wintypes, windll
 from typing import Any
@@ -43,6 +43,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         ("After of...", "after_of_episode"),
         ("Sobrescritura 1", "overwrite_1_times"),
         ("Sobrescritura 2", "overwrite_2_times"),
+        ("Sobrescritura Anacrónica", "overwrite_anachronic_times"),
         ("Sobrescritura 3", "overwrite_3_times"),
         ("Free listener", "free_listener_times"),
     ]
@@ -172,6 +173,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
         row["after_of_episode"] = self._comment_field(comment_raw, "after_of_episode")
         row["overwrite_1_times"] = self._comment_field(comment_raw, "overwrite_1_times")
         row["overwrite_2_times"] = self._comment_field(comment_raw, "overwrite_2_times")
+        row["overwrite_anachronic_times"] = self._comment_field(
+            comment_raw, "overwrite_anachronic_times"
+        )
         row["overwrite_3_times"] = self._comment_field(comment_raw, "overwrite_3_times")
         row["free_listener_times"] = self._comment_field(comment_raw, "free_listener_times")
         return row
@@ -1104,21 +1108,45 @@ class FileTableWidget(QtWidgets.QTableWidget):
         if path:
             QtWidgets.QApplication.clipboard().setText(path)
 
-    def open_current_file_with_rename_dialog(self):
-        path = self.current_file_path()
+    def launch_rename_dialog(self, path: str) -> None:
+        """Abre rename_dialog.py junto a FrameEtude, con fallback heredado."""
         if not path:
             return
 
-        command = ["pythonw", config.RENAME_DIALOG_SCRIPT, path]
+        local_script = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "rename_dialog.py"
+        )
+        legacy_script = getattr(config, "LEGACY_RENAME_DIALOG_SCRIPT", "").strip()
+        script_path = (
+            local_script if os.path.isfile(local_script)
+            else legacy_script if legacy_script and os.path.isfile(legacy_script)
+            else ""
+        )
+        if not script_path:
+            QtWidgets.QMessageBox.critical(
+                self, "Rename dialog no encontrado",
+                "No se encontró rename_dialog.py junto a FrameEtude ni una ruta "
+                "heredada válida en la configuración.",
+            )
+            return
 
+        interpreter = sys.executable
+        if os.name == "nt" and os.path.basename(interpreter).lower() == "python.exe":
+            pythonw = os.path.join(os.path.dirname(interpreter), "pythonw.exe")
+            if os.path.isfile(pythonw):
+                interpreter = pythonw
         try:
-            subprocess.Popen(command)
+            subprocess.Popen(
+                [interpreter, script_path, path],
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
         except Exception as e:
             QtWidgets.QMessageBox.critical(
-                self,
-                "Error",
-                f"No se pudo abrir rename dialog.\n\n{e}",
+                self, "Error", f"No se pudo abrir rename dialog.\\n\\n{e}"
             )
+
+    def open_current_file_with_rename_dialog(self):
+        self.launch_rename_dialog(self.current_file_path())
 
     def open_current_file(self):
         main_window = self.window()
