@@ -199,7 +199,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.metadata_progress_label,
         )
         
-        self.status = QtWidgets.QLabel("FrameEtude Loaded Rerosurces")
+        self.status = QtWidgets.QLabel("FrameEtude Loaded Resources")
         self.main_layout.addWidget(self.status)
         
 
