@@ -102,7 +102,7 @@ OCR_LANG = 'spa'           # Idioma (esp, eng, etc.)
 
 ```toml
 [general]
-BASE_INTERNAL_ROOT = "E:\\_Internal"
+BASE_INTERNAL_ROOT = "E:\_Internal"
 CACHE_SIZE = 15
 ```
 
