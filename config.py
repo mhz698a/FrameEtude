@@ -120,10 +120,8 @@ for obsolete_key in (
 ):
     _C["general"].pop(obsolete_key, None)
 
-# Preserve the old script path only as a temporary compatibility fallback.
-LEGACY_RENAME_DIALOG_SCRIPT = str(
-    _C["general"].pop("RENAME_DIALOG_SCRIPT", "") or ""
-)
+# Discard the obsolete external rename-script setting from older TOML files.
+_C["general"].pop("RENAME_DIALOG_SCRIPT", None)
 
 # --- Exposición de variables con tus conversiones de tipo explícitas ---
 OCR_SCALE = int(_C["ocr"]["OCR_SCALE"])
