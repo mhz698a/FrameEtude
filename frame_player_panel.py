@@ -42,6 +42,35 @@ class FrameCanvas(QtWidgets.QWidget):
         self._frame_image = QtGui.QImage()
         self.update()
 
+    def displayed_image_rect(self):
+        if self._frame_image.isNull():
+            return QtCore.QRect()
+
+        area = self.contentsRect()
+        if area.width() <= 0 or area.height() <= 0:
+            return QtCore.QRect()
+
+        scaled_size = self._frame_image.size().scaled(
+            area.size(),
+            QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+        )
+        if scaled_size.isEmpty():
+            return QtCore.QRect()
+
+        return QtCore.QRect(
+            area.x() + (area.width() - scaled_size.width()) // 2,
+            area.y() + (area.height() - scaled_size.height()) // 2,
+            scaled_size.width(),
+            scaled_size.height(),
+        )
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        viewport = self.parentWidget()
+        main_window = getattr(viewport, "main", None)
+        if main_window is not None:
+            main_window.update_curtain_geometry()
+
     def paintEvent(self, event):
         option = QtWidgets.QStyleOption()
         option.initFrom(self)
@@ -54,23 +83,10 @@ class FrameCanvas(QtWidgets.QWidget):
             self,
         )
 
-        if self._frame_image.isNull():
+        target = self.displayed_image_rect()
+        if target.isEmpty():
             return
 
-        area = self.contentsRect()
-        if area.width() <= 0 or area.height() <= 0:
-            return
-
-        scaled_size = self._frame_image.size().scaled(
-            area.size(),
-            QtCore.Qt.AspectRatioMode.KeepAspectRatio,
-        )
-        target = QtCore.QRect(
-            area.x() + (area.width() - scaled_size.width()) // 2,
-            area.y() + (area.height() - scaled_size.height()) // 2,
-            scaled_size.width(),
-            scaled_size.height(),
-        )
         painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
         painter.drawImage(target, self._frame_image)
 
