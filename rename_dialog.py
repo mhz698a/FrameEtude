@@ -9,7 +9,10 @@ from pathlib import Path
 from PyQt6 import QtWidgets, QtGui
 from PyQt6.QtCore import Qt, pyqtSignal, QBuffer, QIODevice, QSettings
 from pyrenameutils.qss_styles import QSS
-from pyrenameutils.ng_dialog import NewgroundsDialog
+try:
+    from pyrenameutils.ng_dialog import NewgroundsDialog
+except Exception:
+    NewgroundsDialog = None
 from pyrenameutils.helpers_text import sanitize_windows_filename
 from pyrenameutils.helpers_tags import read_tags, write_tags
 from pyrenameutils.helpers_win import set_creation_and_modification_windows, es_solo_lectura_windows, wait_until_file_unlocked, can_write_file, is_file_in_use
@@ -17,7 +20,7 @@ from pyrenameutils.helpers_cover import read_cover_art, write_cover_art, write_c
 
 
 APP_DIR = Path(__file__).resolve().parent.as_posix()
-ICON_WIN = f"{APP_DIR}/assets/catchetude-icon.png"
+ICON_WIN = f"{APP_DIR}/assets/frameetude.ico"
 myappid = 'etudetools.files_mgr.rename_dialog.1.0'
 try:
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
@@ -76,7 +79,7 @@ class RenameDialog(QtWidgets.QWidget):
         self.name, self.ext = os.path.splitext(self.base_name)
         self.is_mp4 = self.ext.lower() in ('.mp4', '.m4a', '.m4v')
         
-        self.settings = QSettings("EtudeTools", "RenameDialogForCatchEtude")
+        self.settings = QSettings("FrameEtude", "RenameDialog")
         self.load_geometry()
         
         self.init_ui()
@@ -182,6 +185,10 @@ class RenameDialog(QtWidgets.QWidget):
         self.comment_edit.setFixedHeight(90)
         
         self.genre_choices = [""]
+        # The strict genre mode is not exposed in this dialog version.
+        self.overwrite_checkbox = QtWidgets.QCheckBox(self)
+        self.overwrite_checkbox.setChecked(False)
+        self.overwrite_checkbox.hide()
 
         self.genre_line = QtWidgets.QLineEdit()
         self.genre_combo = QtWidgets.QComboBox()
@@ -487,6 +494,12 @@ class RenameDialog(QtWidgets.QWidget):
 
     # newgrounds dialog
     def open_ng_dialog(self):
+        if NewgroundsDialog is None:
+            QtWidgets.QMessageBox.warning(
+                self, "Newgrounds",
+                "La integración Newgrounds requiere requests, beautifulsoup4 y python-dateutil.",
+            )
+            return
         dlg = NewgroundsDialog(idsong=self.edit.selectedText() or self.title_edit.selectedText(), parent=self)
         if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
