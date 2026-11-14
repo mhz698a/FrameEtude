@@ -9,10 +9,7 @@ from pathlib import Path
 from PyQt6 import QtWidgets, QtGui
 from PyQt6.QtCore import Qt, pyqtSignal, QBuffer, QIODevice, QSettings
 from pyrenameutils.qss_styles import QSS
-try:
-    from pyrenameutils.ng_dialog import NewgroundsDialog
-except Exception:
-    NewgroundsDialog = None
+
 from pyrenameutils.helpers_text import sanitize_windows_filename
 from pyrenameutils.helpers_tags import read_tags, write_tags
 from pyrenameutils.helpers_win import set_creation_and_modification_windows, es_solo_lectura_windows, wait_until_file_unlocked, can_write_file, is_file_in_use
@@ -31,48 +28,6 @@ try:
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 except Exception:
     pass
-
-class CoverLabel(QtWidgets.QLabel):
-    clicked = pyqtSignal()
-    rightClicked = pyqtSignal(object)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._has_cover = False
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMinimumSize(180, 180)
-        self.setFixedSize(180, 180)
-        self.setStyleSheet("""
-            QLabel {
-                border: 1px solid #444444;
-                background-color: #232323;
-                color: #dddddd;
-            }
-        """)
-        self.setText("Agregar Carátula")
-
-    def set_has_cover(self, has_cover: bool):
-        self._has_cover = has_cover
-        if not has_cover:
-            self.setText("Agregar Carátula")
-
-    def enterEvent(self, event):
-        if not self._has_cover:
-            self.setText("<u>Agregar Carátula</u>")
-        super().enterEvent(event)
-
-    def leaveEvent(self, event):
-        if not self._has_cover:
-            self.setText("Agregar Carátula")
-        super().leaveEvent(event)
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit()
-        elif event.button() == Qt.MouseButton.RightButton:
-            self.rightClicked.emit(event.globalPosition().toPoint())
-        super().mousePressEvent(event)
 
 class RenameDialog(QtWidgets.QWidget):
     def __init__(self, file_path, parent=None):
@@ -138,18 +93,10 @@ class RenameDialog(QtWidgets.QWidget):
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(8)
-        
-        # Newgrounds
-        self.ng_btn = QtWidgets.QPushButton("Newgrounds")
-        self.ng_btn.setFixedHeight(H_WIDGET)
-        self.ng_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.ng_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.ng_btn.clicked.connect(self.open_ng_dialog)
 
         header_layout = QtWidgets.QHBoxLayout()
         header_layout.addWidget(QtWidgets.QLabel("New name:"))
         header_layout.addStretch()
-        header_layout.addWidget(self.ng_btn)
 
         main_layout.addLayout(header_layout)
         
@@ -230,10 +177,6 @@ class RenameDialog(QtWidgets.QWidget):
         self.artist_paste_btn.setFixedHeight(H_WIDGET)
         self.artist_paste_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.artist_paste_btn.setToolTip("Mover el artista al campo de artistas")
-        
-        self.cover_label = CoverLabel()
-        self.cover_label.clicked.connect(self.replace_cover_from_dialog)
-        self.cover_label.rightClicked.connect(self.show_cover_context_menu)
 
         artist_layout = QtWidgets.QHBoxLayout()
         artist_layout.setSpacing(4)
@@ -270,15 +213,7 @@ class RenameDialog(QtWidgets.QWidget):
         meta_layout.addRow(QtWidgets.QLabel("Track:"), self.track_edit)
         meta_layout.addRow(self.disc_label, self.disc_edit)
         meta_layout.addRow(QtWidgets.QLabel("Genre:"), self.genre_stack)
-
-        cover_widget = QtWidgets.QWidget()
-        cover_layout = QtWidgets.QHBoxLayout(cover_widget)
-        cover_layout.setContentsMargins(0, 0, 0, 0)
-        cover_layout.addWidget(self.cover_label)
-        cover_layout.addStretch()
-        meta_layout.addRow(QtWidgets.QLabel("Cover:"), cover_widget)
         meta_layout.addRow(QtWidgets.QLabel("Comment:"), self.comment_edit)
-        
         
         # Footer: checkbox + single Rename button + Close
         footer_layout = QtWidgets.QHBoxLayout()
@@ -497,60 +432,6 @@ class RenameDialog(QtWidgets.QWidget):
         
         self.title_edit.setText(nuevo)
 
-    # newgrounds dialog
-    def open_ng_dialog(self):
-        if NewgroundsDialog is None:
-            QtWidgets.QMessageBox.warning(
-                self, "Newgrounds",
-                "La integración Newgrounds requiere requests, beautifulsoup4 y python-dateutil.",
-            )
-            return
-        dlg = NewgroundsDialog(idsong=self.edit.selectedText() or self.title_edit.selectedText(), parent=self)
-        if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
-            return
-
-        data = dlg.result_data
-        if not data:
-            return
-
-        ng_id = data.get("ng_id", "").strip()
-
-        # --- TITLE ---
-        title = data.get("title")
-        if title:
-            title = title.rstrip()
-            if not re.search(rf"\(ID:\s*{re.escape(ng_id)}\)$", title):
-                title += f" (ID: {ng_id})"
-            self.title_edit.setText(title)
-
-        # --- ARTIST ---
-        artist = data.get("artist")
-        if artist:
-            self.artist_edit.setText(artist)
-
-        # --- FILENAME / RENAME ---
-        filename = data.get("filename")
-        if filename:
-            filename = filename.strip()
-
-            # Sanitizar para Windows
-            filename = sanitize_windows_filename(filename)
-
-            current = self.edit.text().strip()
-
-            # Si ya tiene (η), no mover ni duplicar
-            if current.endswith(" (η)"):
-                # Solo reemplazamos el texto base, conservando el (η)
-                base = current[:-4].rstrip()
-                if base:
-                    filename = base + " (η)"
-                else:
-                    filename = filename + " (η)"
-            else:
-                filename = filename + " (η)"
-
-            self.edit.setText(filename)
-
     # Single action: apply tags and optionally rename (with permission check)
     def on_rename_clicked(self):
         found_fail = False
@@ -696,35 +577,6 @@ class RenameDialog(QtWidgets.QWidget):
                 
         if not found_fail:
             self.close()
-
-    def load_cover_art(self):
-        if read_cover_art is None:
-            self.cover_label.setPixmap(QtGui.QPixmap())
-            self.cover_label.set_has_cover(False)
-            return
-        data = read_cover_art(self.file_path)
-        if not data:
-            self.cover_label.setPixmap(QtGui.QPixmap())
-            self.cover_label.set_has_cover(False)
-            return
-
-        pixmap = QtGui.QPixmap()
-        pixmap.loadFromData(data)
-        if pixmap.isNull():
-            self.cover_label.setPixmap(QtGui.QPixmap())
-            self.cover_label.set_has_cover(False)
-            return
-
-        self.cover_label.set_has_cover(True)
-        self.cover_label.setText("")
-        self.cover_label.setPixmap(
-            pixmap.scaled(
-                self.cover_label.width(),
-                self.cover_label.height(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
-        )
 
 
     def _run_preserving_file_times(self, callback):
