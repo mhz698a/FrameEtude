@@ -93,6 +93,10 @@ class VideoEtude(QtWidgets.QMainWindow):
                 ("Overwrite I", lambda: self.showOverwriteInfo("ov_1")),
                 ("Overwrite II", lambda: self.showOverwriteInfo("ov_2")),
                 ("Overwrite III", lambda: self.showOverwriteInfo("ov_3")),
+                ("Anachronic Overwrite", lambda: self.showOverwriteInfo(
+                    "ov_0", database_path=config.A_OVERWRITE_DATABASE,
+                    label="Anachronic Overwrite",
+                )),
             ]
         )
         self.action_load_selected = self.master_toolbar.add_simplified_action(
@@ -205,10 +209,16 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.main_layout.addWidget(self.status)
         
 
-    def showOverwriteInfo(self, key: str):
-        times_num = get_overwrite_data(key)
+    def showOverwriteInfo(self, key: str, database_path: str | None = None,
+                          label: str = "Overwrite"):
+        if database_path is None:
+            times_num = get_overwrite_data(key)
+        else:
+            times_num = get_overwrite_data(
+                key, database_path=database_path, database_label=label
+            )
         QtWidgets.QMessageBox.information(
-            self, f"Overwrite {times_num[0]} Review: {times_num[1]}", times_num[2]
+            self, f"{label} {times_num[0]} Review: {times_num[1]}", times_num[2]
         )
 
     def resizeEvent(self, event):
@@ -927,16 +937,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         if not video_path:
             return
 
-        command = ["pythonw", config.RENAME_DIALOG_SCRIPT, video_path]
-
-        try:
-            subprocess.Popen(command)
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(
-                self,
-                "Error",
-                f"No se pudo abrir el editor de metadatos.\n\n{e}",
-            )
+        self.file_table.launch_rename_dialog(video_path)
 
     def ensure_workframe_visible(self):
         if not self.right_widget.isVisible():
