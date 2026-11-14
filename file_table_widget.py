@@ -1,4 +1,4 @@
-import os, datetime, subprocess, re, sys
+import os, datetime, re
 import functools
 from ctypes import wintypes, windll
 from typing import Any
@@ -1108,45 +1108,21 @@ class FileTableWidget(QtWidgets.QTableWidget):
         if path:
             QtWidgets.QApplication.clipboard().setText(path)
 
-    def launch_rename_dialog(self, path: str) -> None:
-        """Abre rename_dialog.py junto a FrameEtude, con fallback heredado."""
+    def open_current_file_with_rename_dialog(self):
+        path = self.current_file_path()
         if not path:
             return
 
-        local_script = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "rename_dialog.py"
-        )
-        legacy_script = getattr(config, "LEGACY_RENAME_DIALOG_SCRIPT", "").strip()
-        script_path = (
-            local_script if os.path.isfile(local_script)
-            else legacy_script if legacy_script and os.path.isfile(legacy_script)
-            else ""
-        )
-        if not script_path:
-            QtWidgets.QMessageBox.critical(
-                self, "Rename dialog no encontrado",
-                "No se encontró rename_dialog.py junto a FrameEtude ni una ruta "
-                "heredada válida en la configuración.",
-            )
+        main_window = self.window()
+        if hasattr(main_window, "open_rename_dialog"):
+            main_window.open_rename_dialog(path)
             return
 
-        interpreter = sys.executable
-        if os.name == "nt" and os.path.basename(interpreter).lower() == "python.exe":
-            pythonw = os.path.join(os.path.dirname(interpreter), "pythonw.exe")
-            if os.path.isfile(pythonw):
-                interpreter = pythonw
-        try:
-            subprocess.Popen(
-                [interpreter, script_path, path],
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(
-                self, "Error", f"No se pudo abrir rename dialog.\\n\\n{e}"
-            )
-
-    def open_current_file_with_rename_dialog(self):
-        self.launch_rename_dialog(self.current_file_path())
+        QtWidgets.QMessageBox.warning(
+            self,
+            "Rename dialog",
+            "La ventana principal no proporciona el editor de nombres y metadatos.",
+        )
 
     def open_current_file(self):
         main_window = self.window()
