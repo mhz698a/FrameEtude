@@ -16,12 +16,19 @@ from isodatetimerng import standardize_time_range
 from ffmpeg_writer_api import ffmpeg_available, probe_mp4_duration_seconds, save_mp4_updates_ffmpeg
 
 
+LEGACY_COMMENT_KEYS = (
+    "real_ctime", "real_mtime", "after_of_episode",
+    "overwrite_1_times", "overwrite_2_times", "overwrite_3_times",
+    "free_listener_times",
+)
+
 COMMENT_KEYS = [
     "real_ctime",
     "real_mtime",
     "after_of_episode",
     "overwrite_1_times",
     "overwrite_2_times",
+    "overwrite_anachronic_times",
     "overwrite_3_times",
     "free_listener_times",
 ]
@@ -150,13 +157,15 @@ def _empty_comment_payload() -> dict[str, Any]:
         "after_of_episode": "",
         "overwrite_1_times": "",
         "overwrite_2_times": "",
+        "overwrite_anachronic_times": "",
         "overwrite_3_times": "",
         "free_listener_times": ["", "", ""],
     }
 
 
 def _is_our_comment_data(data: Any) -> bool:
-    return isinstance(data, dict) and all(key in data for key in COMMENT_KEYS)
+    # Existing MP4 comments remain valid without the newly introduced field.
+    return isinstance(data, dict) and all(key in data for key in LEGACY_COMMENT_KEYS)
 
 
 def _normalize_free_listener_value(value: Any) -> list[str]:
@@ -182,7 +191,12 @@ def _normalize_comment_value(key: str, value: Any) -> Any:
     if key == "free_listener_times":
         return _normalize_free_listener_value(value)
 
-    if key in {"overwrite_1_times", "overwrite_2_times", "overwrite_3_times"}:
+    if key in {
+        "overwrite_1_times",
+        "overwrite_2_times",
+        "overwrite_anachronic_times",
+        "overwrite_3_times",
+    }:
         text = _safe_text(value)
         if text:
             return standardize_time_range(text)
@@ -329,6 +343,9 @@ def save_mp4_updates(
             payload = json.loads(raw_text)
         else:
             payload = _empty_comment_payload()
+
+        for payload_key, default_value in _empty_comment_payload().items():
+            payload.setdefault(payload_key, default_value)
 
         for key, value in comment_updates.items():
             payload[key] = _normalize_comment_value(key, value)
