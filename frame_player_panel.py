@@ -3,6 +3,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 
 from curtain_lib import CurtainOverlay
 from ocr_lib import SelectionOverlay
+import config
 
 class FrameViewport(QtWidgets.QWidget):
     def __init__(self, main_window, parent=None):
@@ -225,10 +226,8 @@ class FramePlayerPanel(QtWidgets.QWidget):
         if not hasattr(main, "check_curtain") or main.check_curtain is None:
             main.check_curtain = QtWidgets.QCheckBox()
             main.check_curtain.hide()
-            main.check_curtain.setChecked(False)
+            main.check_curtain.setChecked(config.START_WITH_CURTAIN)
 
-        # El estado de la cortina controla el overlay aunque el checkbox no sea visible.
-        main.check_curtain.toggled.connect(main.update_curtain_visibility)
 
         if not hasattr(main, "check_always_on_top") or main.check_always_on_top is None:
             main.check_always_on_top = QtWidgets.QCheckBox()
@@ -321,3 +320,6 @@ class FramePlayerPanel(QtWidgets.QWidget):
         main.selection_overlay = SelectionOverlay(main.frame_viewport)
         main.selection_overlay.setGeometry(main.frame_viewport.rect())
         main.selection_overlay.selection_made.connect(main._on_selection_made)
+
+        main.check_curtain.toggled.connect(main.update_curtain_visibility)
+        main.update_curtain_visibility()
