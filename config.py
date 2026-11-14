@@ -37,8 +37,8 @@ DEFAULT_OCR_PARAMETERS = {
 }
 
 DEFAULT_SETTINGS = {
-    "RENAME_DIALOG_SCRIPT": r"",
     "OVERWRITE_DATABASE": "",
+    "A_OVERWRITE_DATABASE": "",
     "SEASON_DATABASE": "",
     "BASE_INTERNAL_ROOT": r"E:\_Internal", # Ajuste parametrado para sistema local
     "CONTROL_WIDTH_ESTIMATE": 240,
@@ -120,6 +120,11 @@ for obsolete_key in (
 ):
     _C["general"].pop(obsolete_key, None)
 
+# Preserve the old script path only as a temporary compatibility fallback.
+LEGACY_RENAME_DIALOG_SCRIPT = str(
+    _C["general"].pop("RENAME_DIALOG_SCRIPT", "") or ""
+)
+
 # --- Exposición de variables con tus conversiones de tipo explícitas ---
 OCR_SCALE = int(_C["ocr"]["OCR_SCALE"])
 OCR_USE_CLAHE = bool(_C["ocr"]["OCR_USE_CLAHE"])       
@@ -131,8 +136,8 @@ OCR_BINARIZE = int(_C["ocr"]["OCR_BINARIZE"])
 OCR_PSM = int(_C["ocr"]["OCR_PSM"])
 OCR_LANG = str(_C["ocr"]["OCR_LANG"])
 
-RENAME_DIALOG_SCRIPT = str(_C["general"]["RENAME_DIALOG_SCRIPT"])
 OVERWRITE_DATABASE = str(_C["general"]["OVERWRITE_DATABASE"])
+A_OVERWRITE_DATABASE = str(_C["general"]["A_OVERWRITE_DATABASE"])
 SEASON_DATABASE = str(_C["general"]["SEASON_DATABASE"])
 BASE_INTERNAL_ROOT = str(_C["general"]["BASE_INTERNAL_ROOT"])
 
