@@ -43,6 +43,7 @@ DEFAULT_SETTINGS = {
     "BASE_INTERNAL_ROOT": r"E:\_Internal", # Ajuste parametrado para sistema local
     "CONTROL_WIDTH_ESTIMATE": 240,
     "CACHE_SIZE": 15, # tamaño máximo del cache LRU (afecta rendimiento de CPU/RAM)
+    "START_WITH_CURTAIN": True,
     "BACKUP_PATH": os.environ.get("OneDrive") or (USER_HOME / "Documents").as_posix(),
 }
 
@@ -81,7 +82,9 @@ def save_settings():
     
     lines.append("\n[general]")
     for k, v in _C["general"].items():
-        if isinstance(v, str):
+        if isinstance(v, bool):
+            lines.append(f"{k} = {'true' if v else 'false'}")
+        elif isinstance(v, str):
             # Escapa barras invertidas automáticamente para rutas de Windows
             escaped_str = v.replace("\\", "\\\\")
             lines.append(f'{k} = "{escaped_str}"')
@@ -135,4 +138,5 @@ BASE_INTERNAL_ROOT = str(_C["general"]["BASE_INTERNAL_ROOT"])
 
 CONTROL_WIDTH_ESTIMATE = int(_C["general"]["CONTROL_WIDTH_ESTIMATE"])
 CACHE_SIZE = int(_C["general"]["CACHE_SIZE"])
+START_WITH_CURTAIN = bool(_C["general"]["START_WITH_CURTAIN"])
 BACKUP_PATH = str(_C["general"]["BACKUP_PATH"])
