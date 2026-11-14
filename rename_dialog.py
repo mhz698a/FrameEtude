@@ -16,7 +16,12 @@ except Exception:
 from pyrenameutils.helpers_text import sanitize_windows_filename
 from pyrenameutils.helpers_tags import read_tags, write_tags
 from pyrenameutils.helpers_win import set_creation_and_modification_windows, es_solo_lectura_windows, wait_until_file_unlocked, can_write_file, is_file_in_use
-from pyrenameutils.helpers_cover import read_cover_art, write_cover_art, write_cover_art_data, export_cover_art
+try:
+    from pyrenameutils.helpers_cover import (
+        read_cover_art, write_cover_art, write_cover_art_data, export_cover_art
+    )
+except Exception:
+    read_cover_art = write_cover_art = write_cover_art_data = export_cover_art = None
 
 
 APP_DIR = Path(__file__).resolve().parent.as_posix()
@@ -693,6 +698,10 @@ class RenameDialog(QtWidgets.QWidget):
             self.close()
 
     def load_cover_art(self):
+        if read_cover_art is None:
+            self.cover_label.setPixmap(QtGui.QPixmap())
+            self.cover_label.set_has_cover(False)
+            return
         data = read_cover_art(self.file_path)
         if not data:
             self.cover_label.setPixmap(QtGui.QPixmap())
@@ -747,6 +756,9 @@ class RenameDialog(QtWidgets.QWidget):
         if not path:
             return
 
+        if write_cover_art is None:
+            QtWidgets.QMessageBox.warning(self, "Carátula", "Mutagen no está disponible para editar carátulas.")
+            return
         try:
             self._run_preserving_file_times(lambda: write_cover_art(self.file_path, path))
             self.load_cover_art()
@@ -772,6 +784,9 @@ class RenameDialog(QtWidgets.QWidget):
             self.paste_cover_from_clipboard()
 
     def copy_cover_to_clipboard(self):
+        if read_cover_art is None:
+            QtWidgets.QMessageBox.warning(self, "Carátula", "Mutagen no está disponible para leer carátulas.")
+            return
         data = read_cover_art(self.file_path)
         if not data:
             QtWidgets.QMessageBox.information(self, "Carátula", "No hay carátula para copiar.")
@@ -788,6 +803,9 @@ class RenameDialog(QtWidgets.QWidget):
         clipboard.setImage(pixmap.toImage())
 
     def paste_cover_from_clipboard(self):
+        if write_cover_art_data is None:
+            QtWidgets.QMessageBox.warning(self, "Carátula", "Mutagen no está disponible para editar carátulas.")
+            return
         clipboard = QtWidgets.QApplication.clipboard()
         image = clipboard.image()
         if image.isNull():
@@ -820,6 +838,9 @@ class RenameDialog(QtWidgets.QWidget):
 
 
     def export_cover_from_dialog(self):
+        if read_cover_art is None or export_cover_art is None:
+            QtWidgets.QMessageBox.warning(self, "Carátula", "Mutagen no está disponible para exportar carátulas.")
+            return
         data = read_cover_art(self.file_path)
         if not data:
             QtWidgets.QMessageBox.information(self, "Carátula", "No hay carátula para exportar.")
