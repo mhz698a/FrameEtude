@@ -292,6 +292,7 @@ class VideoEtude(QtWidgets.QMainWindow):
     def load_year_data(self, year: str):
         self.exit_lyric_mode(uncheck=True)
         self.chk_lyric.setEnabled(False)
+        self.file_table.load_folder("")
         self.folder_selector_bar.set_folders([])
         self.btn_check.setEnabled(False)
         
@@ -1182,3 +1183,10 @@ class VideoEtude(QtWidgets.QMainWindow):
         dlg = SettingsDialog(self)
         if dlg.exec() and self.worker:
             self.worker.cache_size = config.CACHE_SIZE
+
+    def closeEvent(self, event):
+        try:
+            self.file_table.stop_folder_loading()
+        except Exception:
+            pass
+        super().closeEvent(event)
