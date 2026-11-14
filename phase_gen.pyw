@@ -50,7 +50,8 @@ STRUCT_BLOCK = '''```toml
     "after_of_episode": "", 
     "overwrite_1_times": "", 
     "overwrite_2_times": "", 
-    "overwrite_3_times": "", 
+    "overwrite_anachronic_times": "", 
+    "overwrite_3_times": 
     "free_listener_times": ["", "", ""]
 }
 """
