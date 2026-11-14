@@ -429,7 +429,7 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         self.ensure_workframe_visible()
         self.start_worker_and_open(video_path)
-        self.check_curtain.setChecked(True)
+        self.check_curtain.setChecked(False)
 
     
     def rescan_selected_row(self):
@@ -490,7 +490,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             return
         self.ensure_workframe_visible()
         self.start_worker_and_open(path)
-        self.check_curtain.setChecked(True)
+        self.check_curtain.setChecked(False)
 
     def start_worker_and_open(self, path):
         if self.worker_thread is not None:
@@ -503,7 +503,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.worker = None
             self.worker_thread = None
 
-        self.frame_label.clear_frame()
+        self.frame_canvas.clear_frame()
         self.worker = VideoWorker(cache_size=config.CACHE_SIZE)
         self.worker_thread = QtCore.QThread()
         self.worker.moveToThread(self.worker_thread)
@@ -557,9 +557,9 @@ class VideoEtude(QtWidgets.QMainWindow):
                 arr.strides[0],
                 QtGui.QImage.Format.Format_RGB888,
             )
-            self.frame_label.set_frame_image(image)
+            self.frame_canvas.set_frame_image(image)
         except Exception as error:
-            self.frame_label.clear_frame()
+            self.frame_canvas.clear_frame()
             self.status.setText(f"No se pudo mostrar el fotograma: {error}")
 
     # ---------------- Single-frame layout & curtain ----------------
@@ -775,7 +775,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             return
 
         # central label geometry
-        lbl = self.frame_label
+        lbl = self.frame_canvas
         lbl_geom = lbl.geometry()
         # convert rect to label-local coords
         sel_x = rect.x() - lbl_geom.x()
