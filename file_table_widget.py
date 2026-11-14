@@ -1,4 +1,4 @@
-import os, datetime, subprocess, re
+import os, datetime, re
 import functools
 from ctypes import wintypes, windll
 from typing import Any
@@ -27,6 +27,59 @@ def windows_sort_key():
 
     return functools.cmp_to_key(_StrCmpLogicalW)
 
+class FolderScanThread(QtCore.QThread):
+    row_ready = QtCore.pyqtSignal(int, object)
+    scan_finished = QtCore.pyqtSignal(int, str, object, bool)
+
+    def __init__(self, generation: int, folder_path: str, row_reader, parent=None):
+        super().__init__(parent)
+        self.generation = generation
+        self.folder_path = folder_path
+        self._row_reader = row_reader
+
+    def run(self):
+        rows = []
+        try:
+            entries = []
+            with os.scandir(self.folder_path) as scan:
+                for entry in scan:
+                    if self.isInterruptionRequested():
+                        break
+                    if entry.is_file():
+                        entries.append(entry)
+
+            if not self.isInterruptionRequested():
+                sort_key = windows_sort_key()
+                entries.sort(key=lambda entry: sort_key(entry.name))
+
+            allowed_extensions = {
+                ".mp4", ".m4v", ".mov", ".mkv", ".avi", ".wmv", ".flv"
+            }
+            for entry in entries:
+                if self.isInterruptionRequested():
+                    break
+
+                if os.path.splitext(entry.name)[1].lower() not in allowed_extensions:
+                    continue
+
+                row = self._row_reader(entry.path)
+                if self.isInterruptionRequested():
+                    break
+
+                rows.append(row)
+                self.row_ready.emit(self.generation, row)
+        except Exception:
+            # Keep rows already read if a directory entry cannot be inspected.
+            pass
+
+        self.scan_finished.emit(
+            self.generation,
+            self.folder_path,
+            rows,
+            self.isInterruptionRequested(),
+        )
+
+
 class FileTableWidget(QtWidgets.QTableWidget):
     COLUMNS = [
         ("Duration 🔒", "duration"),
@@ -43,6 +96,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         ("After of...", "after_of_episode"),
         ("Sobrescritura 1", "overwrite_1_times"),
         ("Sobrescritura 2", "overwrite_2_times"),
+        ("Sobrescritura Anacrónica", "overwrite_anachronic_times"),
         ("Sobrescritura 3", "overwrite_3_times"),
         ("Free listener", "free_listener_times"),
     ]
@@ -52,6 +106,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
         super().__init__(parent)
         self._folder_cache: dict[str, list[dict[str, Any]]] = {}
         self._duration_cache: dict[str, str] = {}
+        self._folder_load_generation = 0
+        self._active_folder_scan: FolderScanThread | None = None
+        self._pending_folder_scan: tuple[int, str] | None = None
         self._duration_threads: list[DurationFetchThread] = []
         self._current_folder = ""
         self._settings = QtCore.QSettings("FrameEtude", "FileTableWidget")
@@ -172,6 +229,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
         row["after_of_episode"] = self._comment_field(comment_raw, "after_of_episode")
         row["overwrite_1_times"] = self._comment_field(comment_raw, "overwrite_1_times")
         row["overwrite_2_times"] = self._comment_field(comment_raw, "overwrite_2_times")
+        row["overwrite_anachronic_times"] = self._comment_field(
+            comment_raw, "overwrite_anachronic_times"
+        )
         row["overwrite_3_times"] = self._comment_field(comment_raw, "overwrite_3_times")
         row["free_listener_times"] = self._comment_field(comment_raw, "free_listener_times")
         return row
@@ -180,56 +240,173 @@ class FileTableWidget(QtWidgets.QTableWidget):
         self._folder_cache.pop(folder_path, None)
 
     def load_folder(self, folder_path: str):
-        self._current_folder = folder_path if folder_path and os.path.isdir(folder_path) else ""
+        # Every selection invalidates previous row and completion signals.
+        self._folder_load_generation += 1
+        generation = self._folder_load_generation
+        self._pending_folder_scan = None
+
+        active_thread = self._active_folder_scan
+        if active_thread is not None and active_thread.isRunning():
+            active_thread.requestInterruption()
+        elif active_thread is not None:
+            self._active_folder_scan = None
+
+        # Duration jobs from the previous folder are no longer useful.
+        for thread in tuple(self._duration_threads):
+            if thread.isRunning():
+                thread.requestInterruption()
+
+        self._current_folder = (
+            folder_path if folder_path and os.path.isdir(folder_path) else ""
+        )
+        self.clearSelection()
+        self.setCurrentCell(-1, -1)
         self.setRowCount(0)
+        self.row_count_changed.emit(0)
+        self._sync_scrollbars()
 
         if not self._current_folder:
-            self.row_count_changed.emit(0)
-            self._sync_scrollbars()
             return
 
         if self._current_folder in self._folder_cache:
-            rows = self._folder_cache[self._current_folder]
-            for idx, row_data in enumerate(rows, start=1):
-                self._append_row_data(row_data)
-                self.row_count_changed.emit(idx)
-                QtWidgets.QApplication.processEvents()  
-                          
-            self._save_header_state()
-            self._sync_scrollbars()
-            self.row_count_changed.emit(len(rows))
-            self._start_duration_fetch(rows)
+            rows = list(self._folder_cache[self._current_folder])
+            QtCore.QTimer.singleShot(
+                0,
+                lambda g=generation, p=self._current_folder, r=rows:
+                    self._append_cached_folder_rows(g, p, r, 0),
+            )
             return
 
-        rows = []
-        try:
-            entries = sorted(
-                [e for e in os.scandir(self._current_folder) if e.is_file()],
-                key=lambda e: windows_sort_key()(e.name),
+        self._pending_folder_scan = (generation, self._current_folder)
+        self._start_pending_folder_scan()
+
+    def _append_cached_folder_rows(
+        self,
+        generation: int,
+        folder_path: str,
+        rows: list[dict[str, Any]],
+        start_index: int,
+    ) -> None:
+        if (
+            generation != self._folder_load_generation
+            or folder_path != self._current_folder
+        ):
+            return
+
+        batch_size = 100
+        end_index = min(start_index + batch_size, len(rows))
+        for row_data in rows[start_index:end_index]:
+            self._append_row_data(row_data)
+
+        self.row_count_changed.emit(self.rowCount())
+
+        if end_index < len(rows):
+            QtCore.QTimer.singleShot(
+                0,
+                lambda g=generation, p=folder_path, r=rows, i=end_index:
+                    self._append_cached_folder_rows(g, p, r, i),
             )
-            
-            for entry in entries:
-                if not entry.is_file():
-                    continue
+            return
 
-                if os.path.splitext(entry.name)[1].lower() not in {
-                    ".mp4", ".m4v", ".mov", ".mkv", ".avi", ".wmv", ".flv"
-                }:
-                    continue
+        self._finish_folder_load(generation, folder_path, rows, cache_result=False)
 
-                row = self._read_file_row(entry.path)
-                rows.append(row)
-                self._append_row_data(row)
-                self.row_count_changed.emit(len(rows))
-                QtWidgets.QApplication.processEvents()
-        except Exception:
-            pass
+    def _start_pending_folder_scan(self) -> None:
+        pending = self._pending_folder_scan
+        if pending is None:
+            return
 
-        self._folder_cache[self._current_folder] = rows
+        active_thread = self._active_folder_scan
+        if active_thread is not None and active_thread.isRunning():
+            return
+        if active_thread is not None:
+            self._active_folder_scan = None
+
+        generation, folder_path = pending
+        if (
+            generation != self._folder_load_generation
+            or folder_path != self._current_folder
+        ):
+            self._pending_folder_scan = None
+            return
+
+        self._pending_folder_scan = None
+        thread = FolderScanThread(
+            generation,
+            folder_path,
+            self._read_file_row,
+            self,
+        )
+        self._active_folder_scan = thread
+        thread.row_ready.connect(self._on_folder_scan_row)
+        thread.scan_finished.connect(self._on_folder_scan_finished)
+        thread.finished.connect(self._on_folder_scan_thread_finished)
+        thread.finished.connect(thread.deleteLater)
+        thread.start()
+
+    def _on_folder_scan_row(self, generation: int, row_data: dict[str, Any]) -> None:
+        if generation != self._folder_load_generation:
+            return
+
+        row_path = row_data.get("full_path", "")
+        if row_path:
+            row_folder = os.path.normcase(os.path.normpath(os.path.dirname(row_path)))
+            current_folder = os.path.normcase(os.path.normpath(self._current_folder))
+            if row_folder != current_folder:
+                return
+
+        self._append_row_data(row_data)
+        self.row_count_changed.emit(self.rowCount())
+
+    def _on_folder_scan_finished(
+        self,
+        generation: int,
+        folder_path: str,
+        rows: list[dict[str, Any]],
+        cancelled: bool,
+    ) -> None:
+        if cancelled:
+            return
+        self._finish_folder_load(generation, folder_path, rows, cache_result=True)
+
+    def _on_folder_scan_thread_finished(self) -> None:
+        thread = self.sender()
+        if self._active_folder_scan is thread:
+            self._active_folder_scan = None
+        self._start_pending_folder_scan()
+
+    def _finish_folder_load(
+        self,
+        generation: int,
+        folder_path: str,
+        rows: list[dict[str, Any]],
+        *,
+        cache_result: bool,
+    ) -> None:
+        if (
+            generation != self._folder_load_generation
+            or folder_path != self._current_folder
+        ):
+            return
+
+        if cache_result:
+            self._folder_cache[folder_path] = rows
+
         self._save_header_state()
         self._sync_scrollbars()
         self.row_count_changed.emit(len(rows))
         self._start_duration_fetch(rows)
+
+    def stop_folder_loading(self) -> None:
+        """Cancel folder and cached-row loading before the table is destroyed."""
+        self._folder_load_generation += 1
+        self._pending_folder_scan = None
+
+        thread = self._active_folder_scan
+        if thread is not None and thread.isRunning():
+            thread.requestInterruption()
+            thread.wait()
+
+        self._active_folder_scan = None
 
     def _append_row_data(self, row_data: dict[str, Any]) -> None:
         row_index = self.rowCount()
@@ -1109,16 +1286,16 @@ class FileTableWidget(QtWidgets.QTableWidget):
         if not path:
             return
 
-        command = ["pythonw", config.RENAME_DIALOG_SCRIPT, path]
+        main_window = self.window()
+        if hasattr(main_window, "open_rename_dialog"):
+            main_window.open_rename_dialog(path)
+            return
 
-        try:
-            subprocess.Popen(command)
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(
-                self,
-                "Error",
-                f"No se pudo abrir rename dialog.\n\n{e}",
-            )
+        QtWidgets.QMessageBox.warning(
+            self,
+            "Rename dialog",
+            "La ventana principal no proporciona el editor de nombres y metadatos.",
+        )
 
     def open_current_file(self):
         main_window = self.window()

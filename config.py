@@ -17,7 +17,6 @@ APP_DIR = Path(__file__).resolve().parent.as_posix()
 ICON_PATH_LIRYCS = f"{APP_DIR}/assets/lyricsbook.ico"
 ICON_PATH = f"{APP_DIR}/assets/frameetude.ico"
 VIDEO_EXTS = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv'}
-THUMB_ASPECT = 9/16
 VALID_FOLDER_SUFFIXES = ("lyrics", "wroad", "writed")
 
 APPDATA_DIR = Path(os.getenv("APPDATA", USER_HOME)) / APP_NAME
@@ -38,16 +37,13 @@ DEFAULT_OCR_PARAMETERS = {
 }
 
 DEFAULT_SETTINGS = {
-    "RENAME_DIALOG_SCRIPT": r"",
     "OVERWRITE_DATABASE": "",
+    "A_OVERWRITE_DATABASE": "",
     "SEASON_DATABASE": "",
     "BASE_INTERNAL_ROOT": r"E:\_Internal", # Ajuste parametrado para sistema local
-    "DEFAULT_THUMB_WIDTH": 700,
-    "MIN_THUMB_WIDTH": 120,
-    "NUM_THUMBS": 5,
-    "THUMB_SPACING": 8,
     "CONTROL_WIDTH_ESTIMATE": 240,
     "CACHE_SIZE": 15, # tamaño máximo del cache LRU (afecta rendimiento de CPU/RAM)
+    "START_WITH_CURTAIN": True,
     "BACKUP_PATH": os.environ.get("OneDrive") or (USER_HOME / "Documents").as_posix(),
 }
 
@@ -86,7 +82,9 @@ def save_settings():
     
     lines.append("\n[general]")
     for k, v in _C["general"].items():
-        if isinstance(v, str):
+        if isinstance(v, bool):
+            lines.append(f"{k} = {'true' if v else 'false'}")
+        elif isinstance(v, str):
             # Escapa barras invertidas automáticamente para rutas de Windows
             escaped_str = v.replace("\\", "\\\\")
             lines.append(f'{k} = "{escaped_str}"')
@@ -113,6 +111,18 @@ def update_and_save(ocr_data, general_data):
 # --- Cargar datos inicialmente desde el archivo ---
 load_settings()
 
+# The single-frame viewer no longer uses the legacy multi-thumbnail settings.
+for obsolete_key in (
+    "DEFAULT_THUMB_WIDTH",
+    "MIN_THUMB_WIDTH",
+    "NUM_THUMBS",
+    "THUMB_SPACING",
+):
+    _C["general"].pop(obsolete_key, None)
+
+# Discard the obsolete external rename-script setting from older TOML files.
+_C["general"].pop("RENAME_DIALOG_SCRIPT", None)
+
 # --- Exposición de variables con tus conversiones de tipo explícitas ---
 OCR_SCALE = int(_C["ocr"]["OCR_SCALE"])
 OCR_USE_CLAHE = bool(_C["ocr"]["OCR_USE_CLAHE"])       
@@ -124,15 +134,12 @@ OCR_BINARIZE = int(_C["ocr"]["OCR_BINARIZE"])
 OCR_PSM = int(_C["ocr"]["OCR_PSM"])
 OCR_LANG = str(_C["ocr"]["OCR_LANG"])
 
-RENAME_DIALOG_SCRIPT = str(_C["general"]["RENAME_DIALOG_SCRIPT"])
 OVERWRITE_DATABASE = str(_C["general"]["OVERWRITE_DATABASE"])
+A_OVERWRITE_DATABASE = str(_C["general"]["A_OVERWRITE_DATABASE"])
 SEASON_DATABASE = str(_C["general"]["SEASON_DATABASE"])
 BASE_INTERNAL_ROOT = str(_C["general"]["BASE_INTERNAL_ROOT"])
 
-DEFAULT_THUMB_WIDTH = int(_C["general"]["DEFAULT_THUMB_WIDTH"])
-MIN_THUMB_WIDTH = int(_C["general"]["MIN_THUMB_WIDTH"])
-NUM_THUMBS = int(_C["general"]["NUM_THUMBS"])
-THUMB_SPACING = int(_C["general"]["THUMB_SPACING"])
 CONTROL_WIDTH_ESTIMATE = int(_C["general"]["CONTROL_WIDTH_ESTIMATE"])
 CACHE_SIZE = int(_C["general"]["CACHE_SIZE"])
+START_WITH_CURTAIN = bool(_C["general"]["START_WITH_CURTAIN"])
 BACKUP_PATH = str(_C["general"]["BACKUP_PATH"])

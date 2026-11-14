@@ -11,6 +11,7 @@ import config
 from utils import *
 from infoutils import get_overwrite_data
 from frame_player_panel import FramePlayerPanel
+from rename_dialog import RenameDialog
 from lyric_vision_panel import LyricVisionPanel
 from about_season_dialog import AboutSeasonDialog
 from year_selector_bar import YearSelectorBar
@@ -51,9 +52,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         right = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key.Key_Right), self)
         right.activated.connect(lambda: self.move_seconds(1))
 
-        # initial layout build (no video yet)
-        self.rebuild_thumb_layout()
-        self.update_thumbs_visibility()
+        # The single-frame viewer is initialized by FramePlayerPanel.
 
         # populate left panel combos
         try:
@@ -95,6 +94,10 @@ class VideoEtude(QtWidgets.QMainWindow):
                 ("Overwrite I", lambda: self.showOverwriteInfo("ov_1")),
                 ("Overwrite II", lambda: self.showOverwriteInfo("ov_2")),
                 ("Overwrite III", lambda: self.showOverwriteInfo("ov_3")),
+                ("Anachronic Overwrite", lambda: self.showOverwriteInfo(
+                    "anachronic_overwriting", database_path=config.A_OVERWRITE_DATABASE,
+                    label="Anachronic Overwrite",
+                )),
             ]
         )
         self.action_load_selected = self.master_toolbar.add_simplified_action(
@@ -164,8 +167,12 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.right_stack.setCurrentWidget(self.frame_player_panel)
         
         # Agregar paneles al splitter
+        self.right_widget.setMinimumWidth(0)
+        self.frame_player_panel.setMinimumWidth(0)
         self.splitter.addWidget(self.left_panel)
         self.splitter.addWidget(self.right_widget)
+        self.splitter.setStretchFactor(0, 1)
+        self.splitter.setStretchFactor(1, 1)
         self.splitter.setSizes([660, 640])
 
         # ---------------- ABAJO: Progress Row Global ----------------
@@ -203,17 +210,23 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.main_layout.addWidget(self.status)
         
 
-    def showOverwriteInfo(self, key: str):
-        times_num = get_overwrite_data(key)
+    def showOverwriteInfo(self, key: str, database_path: str | None = None,
+                          label: str = "Overwrite"):
+        if database_path is None:
+            times_num = get_overwrite_data(key)
+        else:
+            times_num = get_overwrite_data(
+                key, database_path=database_path, database_label=label
+            )
         QtWidgets.QMessageBox.information(
-            self, f"Overwrite {times_num[0]} Review: {times_num[1]}", times_num[2]
+            self, f"{label} {times_num[0]} Review: {times_num[1]}", times_num[2]
         )
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         # keep overlay sized to thumb_container
         try:
-            self.selection_overlay.setGeometry(0, 0, self.thumb_container.width(), self.thumb_container.height())
+            self.selection_overlay.setGeometry(0, 0, self.frame_viewport.width(), self.frame_viewport.height())
             self.update_curtain_geometry()
         except Exception:
             pass
@@ -279,6 +292,7 @@ class VideoEtude(QtWidgets.QMainWindow):
     def load_year_data(self, year: str):
         self.exit_lyric_mode(uncheck=True)
         self.chk_lyric.setEnabled(False)
+        self.file_table.load_folder("")
         self.folder_selector_bar.set_folders([])
         self.btn_check.setEnabled(False)
         
@@ -427,7 +441,6 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         self.ensure_workframe_visible()
         self.start_worker_and_open(video_path)
-        self.check_curtain.setChecked(True)
 
     
     def rescan_selected_row(self):
@@ -488,7 +501,6 @@ class VideoEtude(QtWidgets.QMainWindow):
             return
         self.ensure_workframe_visible()
         self.start_worker_and_open(path)
-        self.check_curtain.setChecked(True)
 
     def start_worker_and_open(self, path):
         if self.worker_thread is not None:
@@ -501,6 +513,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.worker = None
             self.worker_thread = None
 
+        self.frame_canvas.clear_frame()
         self.worker = VideoWorker(cache_size=config.CACHE_SIZE)
         self.worker_thread = QtCore.QThread()
         self.worker.moveToThread(self.worker_thread)
@@ -522,7 +535,6 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.video_slider.setValue(0)
         self.video_slider.blockSignals(False)
         
-        self.rebuild_thumb_layout()
         self.request_current_frames()
 
     def on_worker_error(self, msg):
@@ -532,139 +544,45 @@ class VideoEtude(QtWidgets.QMainWindow):
     def request_current_frames(self):
         if self.worker is None:
             return
-        show_adj = bool(self.check_adjacent.isChecked())
-        QtCore.QMetaObject.invokeMethod(self.worker, "request_frames", QtCore.Qt.ConnectionType.QueuedConnection,
-                                        QtCore.Q_ARG(int, self.frame_actual), QtCore.Q_ARG(bool, show_adj))
+        QtCore.QMetaObject.invokeMethod(
+            self.worker,
+            "request_frames",
+            QtCore.Qt.ConnectionType.QueuedConnection,
+            QtCore.Q_ARG(int, self.frame_actual),
+            QtCore.Q_ARG(bool, False),
+        )
 
     @QtCore.pyqtSlot(object)
     def on_frames_ready(self, frames_dict):
-        visible_indices = list(range(config.NUM_THUMBS)) if self.check_adjacent.isChecked() else [2]
-        for idx, arr in frames_dict.items():
-            if not (0 <= idx < self.frame_count):
-                continue
-            rel = idx - self.frame_actual
-            label_index = 2 + rel
-            if label_index < 0 or label_index >= config.NUM_THUMBS:
-                if idx == self.frame_actual:
-                    label_index = 2
-                else:
-                    continue
-            if label_index not in visible_indices and not self.check_adjacent.isChecked():
-                continue
-            try:
-                h, w, _ = arr.shape
-                qimg = QtGui.QImage(arr.data, w, h, arr.strides[0], QtGui.QImage.Format.Format_RGB888)
-                pix = QtGui.QPixmap.fromImage(qimg).scaled(
-                    self.thumb_labels[label_index].size(), 
-                    QtCore.Qt.AspectRatioMode.KeepAspectRatio, 
-                    QtCore.Qt.TransformationMode.SmoothTransformation
-                    )
-            except Exception:
-                pix = QtGui.QPixmap(self.thumb_labels[label_index].width(), self.thumb_labels[label_index].height())
-                pix.fill(QtGui.QColor(18,18,18))
-            self.thumb_labels[label_index].setPixmap(pix)
+        arr = frames_dict.get(self.frame_actual)
+        if arr is None:
+            return
 
-        self.rebuild_thumb_layout(apply_cached_sizes=True)
-
-    # ---------------- Layout & rendering ----------------
-    def available_thumb_area_width(self):
-        container_w = max(200, self.thumb_container.width())
-        return container_w
-
-    def compute_thumb_size_for(self, visible_count):
-        container_h = self.thumb_container.height()
-        if container_h <= 50:
-            container_h = 300  # Altura por defecto si aún no se ha dibujado
-        
-        # Calcular el alto en base al espacio vertical disponible del contenedor
-        h = container_h
-        w = int(h / config.THUMB_ASPECT)
-        
-        # Validar que no rebase el ancho disponible en la pantalla
-        avail_w = self.available_thumb_area_width()
-        if visible_count <= 0:
-            visible_count = 1
-        total_spacing = config.THUMB_SPACING * (visible_count - 1)
-        max_w_by_width = (avail_w - total_spacing) / visible_count
-        
-        if w > max_w_by_width:
-            w = int(max_w_by_width)
-            h = int(w * config.THUMB_ASPECT)
-            
-        w = int(max(config.MIN_THUMB_WIDTH, w))
-        h = int(w * config.THUMB_ASPECT)
-        return w, h
-
-    def clear_layout(self, layout):
-        while layout.count():
-            item = layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                layout.removeWidget(widget)
-
-    def rebuild_thumb_layout(self, apply_cached_sizes=False):
-        visible_indices = list(range(config.NUM_THUMBS)) if self.check_adjacent.isChecked() else [2]
-        visible_count = len(visible_indices)
-        # clear current labels from layout
-        while self.thumb_layout.count():
-            it = self.thumb_layout.takeAt(0)
-            w = it.widget()
-            if w:
-                self.thumb_layout.removeWidget(w)
-
-        if visible_count == 1:
-            self.thumb_layout.addStretch(1)
-            self.thumb_layout.addWidget(self.thumb_labels[visible_indices[0]])
-            self.thumb_layout.addStretch(1)
-        else:
-            for i in visible_indices:
-                self.thumb_layout.addWidget(self.thumb_labels[i])
-
-        w, h = self.compute_thumb_size_for(visible_count)
-        for i, lbl in enumerate(self.thumb_labels):
-            if i in visible_indices:
-                lbl.setFixedSize(w, h)
-                lbl.show()
-            else:
-                lbl.hide()
-                
-        self.thumb_container.update()
-        self.update_curtain_geometry()
-
-    def update_thumbs_visibility(self):
-        self.rebuild_thumb_layout()
-        self.request_current_frames()
-
-    def update_curtain_geometry(self):
-        visible_count = config.NUM_THUMBS if self.check_adjacent.isChecked() else 1
-        _, thumb_h = self.compute_thumb_size_for(visible_count)
-        
-        # Tomar el ancho completo del contenedor (thumb_container)
-        w = self.thumb_container.width()
-        if w <= 10 and self.thumb_container.parentWidget():
-            w = self.thumb_container.parentWidget().width()
-            
-        self.curtain.set_geometry_height(0, 0, w, thumb_h)
-        if self.check_curtain.isChecked():
-            self.curtain.show()
-            self.curtain.raise_()
-        else:
-            self.curtain.hide()
-            
-    def update_curtain_visibility(self):
         try:
+            height, width, _ = arr.shape
+            image = QtGui.QImage(
+                arr.data,
+                width,
+                height,
+                arr.strides[0],
+                QtGui.QImage.Format.Format_RGB888,
+            )
+            self.frame_canvas.set_frame_image(image)
             self.update_curtain_geometry()
-        except Exception:
-            if hasattr(self, 'curtain') and hasattr(self, 'thumb_container'):
-                vis_count = config.NUM_THUMBS if getattr(self, 'check_adjacent', None) and self.check_adjacent.isChecked() else 1
-                _, h = self.compute_thumb_size_for(vis_count)
-                w = self.thumb_container.width()
-                if w <= 10 and self.thumb_container.parentWidget():
-                    w = self.thumb_container.parentWidget().width()
-                self.curtain.set_geometry_height(0, 0, w, h)
-        else:
-            if hasattr(self, 'curtain') and self.check_curtain.isChecked():
-                self.curtain.raise_()
+        except Exception as error:
+            self.frame_canvas.clear_frame()
+            self.status.setText(f"No se pudo mostrar el fotograma: {error}")
+
+    # ---------------- Single-frame layout & curtain ----------------
+    def update_curtain_geometry(self):
+        if not hasattr(self, "frame_canvas"):
+            return
+        self.frame_canvas.update_curtain_geometry()
+
+    def update_curtain_visibility(self):
+        if hasattr(self, "frame_canvas") and hasattr(self, "check_curtain"):
+            self.frame_canvas.set_curtain_enabled(self.check_curtain.isChecked())
+            self.update_curtain_geometry()
 
     # ---------------- Navigation ----------------
     def show_frames(self, frame_num):
@@ -838,10 +756,6 @@ class VideoEtude(QtWidgets.QMainWindow):
 
     # ---------------- OCR selection flow ----------------
     def activate_ocr_selection(self):
-        # only allowed when adyacentes desactivado
-        if self.check_adjacent.isChecked():
-            QtWidgets.QMessageBox.warning(self, "Aviso", "Desactive 'Mostrar adyacentes' para usar CCR en la miniatura central.")
-            return
         # ensure we have a frame
         if self.worker is None:
             QtWidgets.QMessageBox.warning(self, "Aviso", "Seleccione un video primero.")
@@ -865,7 +779,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             return
 
         # central label geometry
-        lbl = self.thumb_labels[2]
+        lbl = self.frame_canvas
         lbl_geom = lbl.geometry()
         # convert rect to label-local coords
         sel_x = rect.x() - lbl_geom.x()
@@ -886,22 +800,33 @@ class VideoEtude(QtWidgets.QMainWindow):
             self.status.setText('Selección demasiado pequeña.')
             return
 
-        # map selection pixels from label to original frame
+        # Map the selected area against the image fitted inside the label (KeepAspectRatio).
         img_h, img_w, _ = arr.shape
         lbl_w = lbl_geom.width()
         lbl_h = lbl_geom.height()
-        # The displayed pixmap uses KeepAspectRatioByExpanding; compute scale and crop offsets
-        scale = max(lbl_w / img_w, lbl_h / img_h)
-        new_w = img_w * scale
-        new_h = img_h * scale
-        offset_x = (new_w - lbl_w) / 2.0
-        offset_y = (new_h - lbl_h) / 2.0
+        if lbl_w <= 0 or lbl_h <= 0:
+            self.status.setText('El área del visor no tiene un tamaño válido.')
+            return
 
-        # map: image_x = (sel_x + offset_x)/scale
-        img_x = int(max(0, min(img_w - 1, (sel_x + offset_x) / scale)))
-        img_y = int(max(0, min(img_h - 1, (sel_y + offset_y) / scale)))
-        img_x2 = int(max(0, min(img_w, ((sel_x + offset_x) + sel_w) / scale)))
-        img_y2 = int(max(0, min(img_h, ((sel_y + offset_y) + sel_h) / scale)))
+        scale = min(lbl_w / img_w, lbl_h / img_h)
+        rendered_w = img_w * scale
+        rendered_h = img_h * scale
+        offset_x = (lbl_w - rendered_w) / 2.0
+        offset_y = (lbl_h - rendered_h) / 2.0
+
+        selection_left = max(float(sel_x), offset_x)
+        selection_top = max(float(sel_y), offset_y)
+        selection_right = min(float(sel_x + sel_w), offset_x + rendered_w)
+        selection_bottom = min(float(sel_y + sel_h), offset_y + rendered_h)
+
+        if selection_right - selection_left <= 2 or selection_bottom - selection_top <= 2:
+            self.status.setText('La selección no contiene área visible del fotograma.')
+            return
+
+        img_x = int(max(0, min(img_w - 1, (selection_left - offset_x) / scale)))
+        img_y = int(max(0, min(img_h - 1, (selection_top - offset_y) / scale)))
+        img_x2 = int(max(0, min(img_w, (selection_right - offset_x) / scale)))
+        img_y2 = int(max(0, min(img_h, (selection_bottom - offset_y) / scale)))
 
         if img_x2 - img_x < 2 or img_y2 - img_y < 2:
             self.status.setText('Selección mapeada demasiado pequeña en el fotograma original.')
@@ -1009,21 +934,32 @@ class VideoEtude(QtWidgets.QMainWindow):
         dlg.show()
 
     
+    def open_rename_dialog(self, video_path: str):
+        if not video_path or not os.path.isfile(video_path):
+            return
+
+        try:
+            self._rename_dialog = RenameDialog(video_path, self)
+            self._rename_dialog.setWindowFlag(
+                QtCore.Qt.WindowType.Window, True
+            )
+            if config.ICON_PATH and os.path.isfile(config.ICON_PATH):
+                self._rename_dialog.setWindowIcon(QtGui.QIcon(config.ICON_PATH))
+            self._rename_dialog.show()
+            self._rename_dialog.raise_()
+            self._rename_dialog.activateWindow()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Rename dialog",
+                f"No se pudo abrir el editor de nombre y metadatos.\n\n{e}",
+            )
+
     def edit_selected_metadata(self):
         video_path = self.file_table.current_file_path()
         if not video_path:
             return
-
-        command = ["pythonw", config.RENAME_DIALOG_SCRIPT, video_path]
-
-        try:
-            subprocess.Popen(command)
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(
-                self,
-                "Error",
-                f"No se pudo abrir el editor de metadatos.\n\n{e}",
-            )
+        self.open_rename_dialog(video_path)
 
     def ensure_workframe_visible(self):
         if not self.right_widget.isVisible():
@@ -1245,33 +1181,12 @@ class VideoEtude(QtWidgets.QMainWindow):
     
     def open_settings_dialog(self):
         dlg = SettingsDialog(self)
-        if dlg.exec():
-            # Update thumb labels list if NUM_THUMBS changed
-            if len(self.thumb_labels) != config.NUM_THUMBS:
-                # Remove old labels
-                for lbl in self.thumb_labels:
-                    lbl.setParent(None)
-                    lbl.deleteLater()
-                self.thumb_labels.clear()
+        if dlg.exec() and self.worker:
+            self.worker.cache_size = config.CACHE_SIZE
 
-                # Create new labels
-                for _ in range(config.NUM_THUMBS):
-                    lbl = QtWidgets.QLabel()
-                    lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-                    lbl.setStyleSheet("background-color: rgb(18,18,18); border: 1px solid #2b2b2b;")
-                    lbl.setSizePolicy(
-                        QtWidgets.QSizePolicy.Policy.Fixed,
-                        QtWidgets.QSizePolicy.Policy.Fixed,
-                    )
-                    self.thumb_labels.append(lbl)
-            
-            # Update spacing
-            self.thumb_layout.setSpacing(config.THUMB_SPACING)
-
-            # Update worker cache size
-            if self.worker:
-                self.worker.cache_size = config.CACHE_SIZE
-
-            # Apply immediate UI updates
-            self.rebuild_thumb_layout()
-            self.update_thumbs_visibility()
+    def closeEvent(self, event):
+        try:
+            self.file_table.stop_folder_loading()
+        except Exception:
+            pass
+        super().closeEvent(event)

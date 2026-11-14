@@ -1,30 +1,192 @@
 # frame_player_panel.py
-from PyQt6 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 from curtain_lib import CurtainOverlay
 from ocr_lib import SelectionOverlay
 import config
 
-class ThumbContainer(QtWidgets.QWidget):
+class FrameViewport(QtWidgets.QWidget):
     def __init__(self, main_window, parent=None):
         super().__init__(parent)
         self.main = main_window
-        self._last_height = 0
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        try:
-            self.main.selection_overlay.setGeometry(0, 0, self.width(), self.height())
+        overlay = getattr(self.main, "selection_overlay", None)
+        if overlay is not None:
+            overlay.setGeometry(self.rect())
+
+        if getattr(self.main, "curtain", None) is not None:
             self.main.update_curtain_geometry()
-            
-            # Recalcular tamaño de los fotogramas si la altura cambia
-            current_h = self.height()
-            if abs(current_h - self._last_height) > 2:
-                self._last_height = current_h
-                if hasattr(self.main, "refresh_thumbnails_size"):
-                    QtCore.QTimer.singleShot(10, self.main.refresh_thumbnails_size)
-        except Exception:
-            pass
+
+
+class FrameCanvas(QtWidgets.QWidget):
+    """QSS-aware frame canvas that paints the video image after its styled background."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._frame_image = QtGui.QImage()
+        self.setMinimumSize(0, 0)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet("background-color: black; border: none;")
+        
+        # Estado de la cortina
+        self.curtain_enabled = False
+        self.curtain_top = 0
+        self.curtain_bottom = 0
+        self.min_curtain_height = 10
+        self.dragging_curtain = None
+        self.setMouseTracking(True)
+
+    def set_frame_image(self, image):
+        self._frame_image = image.copy() if image is not None else QtGui.QImage()
+        self.update()
+
+    def clear_frame(self):
+        self._frame_image = QtGui.QImage()
+        self.update()
+
+    def displayed_image_rect(self):
+        if self._frame_image.isNull():
+            return QtCore.QRect()
+
+        area = self.contentsRect()
+        if area.width() <= 0 or area.height() <= 0:
+            return QtCore.QRect()
+
+        scaled_size = self._frame_image.size().scaled(
+            area.size(),
+            QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+        )
+        if scaled_size.isEmpty():
+            return QtCore.QRect()
+
+        return QtCore.QRect(
+            area.x() + (area.width() - scaled_size.width()) // 2,
+            area.y() + (area.height() - scaled_size.height()) // 2,
+            scaled_size.width(),
+            scaled_size.height(),
+        )
+
+    def set_curtain_enabled(self, enabled: bool):
+        self.curtain_enabled = enabled
+        self.update()
+
+    def update_curtain_geometry(self):
+        target = self.displayed_image_rect()
+        if target.isEmpty():
+            return
+        h = target.height()
+        if h <= 0:
+            return
+        if self.curtain_bottom <= 0:
+            default_height = min(150, h // 2)
+            self.curtain_top = (h - default_height) // 2
+            self.curtain_bottom = self.curtain_top + default_height
+        
+        self.curtain_top = max(0, min(self.curtain_top, h - self.min_curtain_height))
+        self.curtain_bottom = max(self.curtain_top + self.min_curtain_height, min(self.curtain_bottom, h))
+        self.update()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update_curtain_geometry()
+        viewport = self.parentWidget()
+        main_window = getattr(viewport, "main", None)
+        if main_window is not None:
+            main_window.update_curtain_geometry()
+
+    def paintEvent(self, event):
+        option = QtWidgets.QStyleOption()
+        option.initFrom(self)
+
+        painter = QtGui.QPainter(self)
+        self.style().drawPrimitive(
+            QtWidgets.QStyle.PrimitiveElement.PE_Widget,
+            option,
+            painter,
+            self,
+        )
+
+        target = self.displayed_image_rect()
+        if target.isEmpty():
+            return
+
+        painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
+        painter.drawImage(target, self._frame_image)
+
+        # Dibujar cortina integrada si está activa
+        if self.curtain_enabled:
+            h = target.height()
+            if h > 0 and self.curtain_bottom > self.curtain_top:
+                painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+                
+                curtain_rect = QtCore.QRect(
+                    target.x(),
+                    target.y() + self.curtain_top,
+                    target.width(),
+                    self.curtain_bottom - self.curtain_top
+                )
+                
+                # Color de la cortina (Negro sólido u opaco)
+                painter.fillRect(curtain_rect, QtGui.QColor(0, 0, 0, 255))
+                
+                # Líneas divisorias superior e inferior de la cortina
+                pen = QtGui.QPen(QtGui.QColor(140, 140, 140, 220))
+                pen.setWidth(2)
+                painter.setPen(pen)
+                painter.drawLine(target.x(), target.y() + self.curtain_top, target.x() + target.width(), target.y() + self.curtain_top)
+                painter.drawLine(target.x(), target.y() + self.curtain_bottom, target.x() + target.width(), target.y() + self.curtain_bottom)
+
+    def mousePressEvent(self, event):
+        if not self.curtain_enabled:
+            super().mousePressEvent(event)
+            return
+        
+        target = self.displayed_image_rect()
+        if target.isEmpty():
+            return
+        
+        y_local = event.position().y() - target.y()
+        if abs(y_local - self.curtain_top) < 10:
+            self.dragging_curtain = 'top'
+        elif abs(y_local - self.curtain_bottom) < 10:
+            self.dragging_curtain = 'bottom'
+        else:
+            self.dragging_curtain = None
+
+    def mouseMoveEvent(self, event):
+        if not self.curtain_enabled:
+            super().mouseMoveEvent(event)
+            return
+        
+        target = self.displayed_image_rect()
+        if target.isEmpty():
+            return
+        
+        y_local = event.position().y() - target.y()
+        h = target.height()
+        
+        if self.dragging_curtain == 'top':
+            self.curtain_top = max(0, min(self.curtain_bottom - self.min_curtain_height, int(y_local)))
+            self.update()
+        elif self.dragging_curtain == 'bottom':
+            self.curtain_bottom = min(h, max(self.curtain_top + self.min_curtain_height, int(y_local)))
+            self.update()
+        else:
+            if abs(y_local - self.curtain_top) < 20 or abs(y_local - self.curtain_bottom) < 20:
+                self.setCursor(QtCore.Qt.CursorShape.SizeVerCursor)
+            else:
+                self.setCursor(QtCore.Qt.CursorShape.ArrowCursor)
+
+    def mouseReleaseEvent(self, event):
+        self.dragging_curtain = None
+        super().mouseReleaseEvent(event)
+
 
 class FramePlayerPanel(QtWidgets.QWidget):
     def __init__(self, main_window):
@@ -76,30 +238,31 @@ class FramePlayerPanel(QtWidgets.QWidget):
         video_box_layout.setSpacing(0)
 
         # Etiqueta de nombre y duración con fondo negro y texto blanco
-        main.info_label = QtWidgets.QLabel("Nombre - Duración")
+        main.info_label = QtWidgets.QLabel("FrameEtude - 00:00:00.000")
         main.info_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         main.info_label.setStyleSheet("""
             background-color: black;
             color: white;
             padding: 6px;
             font-weight: bold;
-            border: 1px solid #2b2b2b;
-            border-bottom: none;
+            border: none;
         """)
         video_box_layout.addWidget(main.info_label)
 
-        main.thumb_container = ThumbContainer(main)
-        main.thumb_container.setStyleSheet(
-            "border: 1px solid #2b2b2b; border: none;"
+        main.frame_viewport = FrameViewport(main)
+        main.frame_viewport.setStyleSheet(
+            "background-color: black; border: none;"
         )
-        main.thumb_layout = QtWidgets.QHBoxLayout(main.thumb_container)
-        main.thumb_layout.setContentsMargins(0, 0, 0, 0)
-        main.thumb_layout.setSpacing(config.THUMB_SPACING)
-        main.thumb_container.setSizePolicy(
+        main.frame_layout = QtWidgets.QHBoxLayout(main.frame_viewport)
+        main.frame_layout.setContentsMargins(0, 0, 0, 0)
+        main.frame_layout.setSpacing(0)
+        main.frame_viewport.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding,
         )
-        video_box_layout.addWidget(main.thumb_container)
+        main.frame_canvas = FrameCanvas(main.frame_viewport)
+        main.frame_layout.addWidget(main.frame_canvas, 1)
+        video_box_layout.addWidget(main.frame_viewport, 1)
 
         # Contenedor del slider con fondo negro y estilo azul
         slider_wrapper = QtWidgets.QWidget()
@@ -172,16 +335,11 @@ class FramePlayerPanel(QtWidgets.QWidget):
 
         controls_layout.addStretch(1) # Centrar a la izquierda
 
-        # Checkboxes lógicos requeridos por la ventana principal por compatibilidad
-        if not hasattr(main, "check_adjacent") or main.check_adjacent is None:
-            main.check_adjacent = QtWidgets.QCheckBox()
-            main.check_adjacent.hide()
-            main.check_adjacent.setChecked(False)
-
         if not hasattr(main, "check_curtain") or main.check_curtain is None:
             main.check_curtain = QtWidgets.QCheckBox()
             main.check_curtain.hide()
-            main.check_curtain.setChecked(True)
+            main.check_curtain.setChecked(config.START_WITH_CURTAIN)
+
 
         if not hasattr(main, "check_always_on_top") or main.check_always_on_top is None:
             main.check_always_on_top = QtWidgets.QCheckBox()
@@ -202,15 +360,10 @@ class FramePlayerPanel(QtWidgets.QWidget):
         
         menu_options.addSeparator()
 
-        action_adj = menu_options.addAction("Mostrar adyacentes")
-        action_adj.setCheckable(True)
-        action_adj.setChecked(main.check_adjacent.isChecked())
-        action_adj.toggled.connect(lambda checked: (main.check_adjacent.setChecked(checked), main.update_thumbs_visibility()))
-
         action_curt = menu_options.addAction("Hide")
         action_curt.setCheckable(True)
         action_curt.setChecked(main.check_curtain.isChecked())
-        action_curt.toggled.connect(lambda checked: (main.check_curtain.setChecked(checked), main.update_curtain_visibility()))
+        action_curt.toggled.connect(main.check_curtain.setChecked)
 
         action_top = menu_options.addAction("Always on top")
         action_top.setCheckable(True)
@@ -273,20 +426,12 @@ class FramePlayerPanel(QtWidgets.QWidget):
 
         layout.addLayout(video_box_layout, 1)
 
-        main.thumb_labels = []
-        for _ in range(config.NUM_THUMBS):
-            lbl = QtWidgets.QLabel()
-            lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            lbl.setStyleSheet("background-color: rgb(18,18,18); border: none;")
-            lbl.setSizePolicy(
-                QtWidgets.QSizePolicy.Policy.Fixed,
-                QtWidgets.QSizePolicy.Policy.Fixed,
-            )
-            main.thumb_labels.append(lbl)
-
-        main.curtain = CurtainOverlay(main.thumb_container)
+        main.curtain = CurtainOverlay(main.frame_viewport)
         main.curtain.hide()
 
-        main.selection_overlay = SelectionOverlay(main.thumb_container)
-        main.selection_overlay.setGeometry(0, 0, 800, 200)
+        main.selection_overlay = SelectionOverlay(main.frame_viewport)
+        main.selection_overlay.setGeometry(main.frame_viewport.rect())
         main.selection_overlay.selection_made.connect(main._on_selection_made)
+
+        main.check_curtain.toggled.connect(main.update_curtain_visibility)
+        main.update_curtain_visibility()

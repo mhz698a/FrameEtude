@@ -12,28 +12,60 @@ class CurtainOverlay(QtWidgets.QWidget):
         self.dragging = None
         self.setMouseTracking(True)
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
-        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, False)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_NoSystemBackground, True)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAutoFillBackground(False)
         self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
+        self._last_height = 0
         self.hide()
 
     def set_geometry_height(self, x, y, w, h):
+        previous_height = self._last_height
         self.setGeometry(x, y, w, h)
-        if self.bottom <= 0 or self.bottom > h:
+
+        if h <= 0:
+            self._last_height = 0
+            return
+
+        if previous_height > 0 and previous_height != h:
+            scale = h / previous_height
+            self.top = round(self.top * scale)
+            self.bottom = round(self.bottom * scale)
+        elif self.bottom <= 0:
             self.bottom = max(self.min_height, h - 10)
-        if self.top < 0:
-            self.top = 0
-        if self.top > self.bottom - self.min_height:
-            self.top = max(0, self.bottom - self.min_height)
+
+        self.top = max(0, min(self.top, h - self.min_height))
+        self.bottom = max(self.top + self.min_height, min(self.bottom, h))
+        self._last_height = h
+
         self.update()
         self.raise_()
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+
+        # Clear this overlay to transparent so the video canvas remains visible
+        # everywhere except inside the explicitly masked curtain region.
+        painter.setCompositionMode(
+            QtGui.QPainter.CompositionMode.CompositionMode_Source
+        )
+        painter.fillRect(event.rect(), QtGui.QColor(0, 0, 0, 0))
+        painter.setCompositionMode(
+            QtGui.QPainter.CompositionMode.CompositionMode_SourceOver
+        )
+
         color = QtGui.QColor(0, 0, 0, 255)
-        rect = QtCore.QRect(0, self.top, self.width(), max(0, self.bottom - self.top))
+        rect = QtCore.QRect(
+            0,
+            self.top,
+            self.width(),
+            max(0, self.bottom - self.top),
+        ).intersected(event.rect())
         painter.fillRect(rect, color)
-        pen = QtGui.QPen(QtGui.QColor(140,140,140,220))
+
+        pen = QtGui.QPen(QtGui.QColor(140, 140, 140, 220))
         pen.setWidth(2)
         painter.setPen(pen)
         painter.drawLine(0, self.top, self.width(), self.top)

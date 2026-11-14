@@ -4,7 +4,8 @@ Una aplicación de escritorio moderna para **navegar, inspeccionar y recortar vi
 
 ## ☀️ Características Principales
 
-- **Navegador de fotogramas**: Visualiza y navega por los fotogramas de tus videos de forma fluida
+- **Visor de fotograma único**: muestra el fotograma actual ajustado al área disponible y se redimensiona automáticamente con el `QSplitter`.
+- **Navegador de fotogramas**: navega por el video fotograma a fotograma
 - **Recortador de video**: Extrae segmentos específicos de tus videos con precisión
 - **OCR integrado**: Extrae texto de fotogramas usando Tesseract con preprocesamiento adaptativo
 - **Gestor de metadatos**: Edita y organiza información de episodios y temporadas
@@ -99,12 +100,15 @@ OCR_LANG = 'spa'           # Idioma (esp, eng, etc.)
 
 ### Parámetros generales disponibles
 
+`OVERWRITE_DATABASE` y `A_OVERWRITE_DATABASE` apuntan a archivos JSON independientes con la misma estructura (`ov_0` a `ov_3`, cada entrada con `id`, `fecha` y `descripcion`). La acción singular **Anachronic Overwrite** consulta la entrada `ov_0` en `A_OVERWRITE_DATABASE`.
+
 ```toml
 [general]
 BASE_INTERNAL_ROOT = "E:\_Internal"
-DEFAULT_THUMB_WIDTH = 700
-NUM_THUMBS = 5
 CACHE_SIZE = 15
+START_WITH_CURTAIN = true  # Activate the curtain when FrameEtude starts
+OVERWRITE_DATABASE = ""      # JSON used by the standard Overwrite actions
+A_OVERWRITE_DATABASE = ""    # Separate JSON used by Anachronic Overwrite
 ```
 
 ## 📁 Estructura del Proyecto
@@ -122,6 +126,8 @@ FrameEtude/
 ├── smb_dialog.py                 # Diálogo de acceso SMB
 ├── windows_share_manager.py      # Gestor de comparticiones Windows
 ├── metadata_edit_lib.py           # Edición de metadatos
+├── rename_dialog.py                # Editor integrado de nombre y etiquetas
+├── pyrenameutils/                  # Utilidades de etiquetas, carátulas y Windows
 ├── lyric_vision_panel.py          # Panel de visualización de letras
 ├── settings_dialog.py             # Diálogo de configuración
 ├── vidwk_lib.py                   # Utilidades de trabajo con video

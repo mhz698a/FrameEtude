@@ -18,12 +18,19 @@ except Exception:
     setctime_blocking = None
 
 
+LEGACY_COMMENT_KEYS = (
+    "real_ctime", "real_mtime", "after_of_episode",
+    "overwrite_1_times", "overwrite_2_times", "overwrite_3_times",
+    "free_listener_times",
+)
+
 COMMENT_KEYS = [
     "real_ctime",
     "real_mtime",
     "after_of_episode",
     "overwrite_1_times",
     "overwrite_2_times",
+    "overwrite_anachronic_times",
     "overwrite_3_times",
     "free_listener_times",
 ]
@@ -67,13 +74,15 @@ def _empty_comment_payload() -> dict[str, Any]:
         "after_of_episode": "",
         "overwrite_1_times": "",
         "overwrite_2_times": "",
+        "overwrite_anachronic_times": "",
         "overwrite_3_times": "",
         "free_listener_times": ["", "", ""],
     }
 
 
 def _is_our_comment_data(data: Any) -> bool:
-    return isinstance(data, dict) and all(key in data for key in COMMENT_KEYS)
+    # Existing MP4 comments remain valid without the newly introduced field.
+    return isinstance(data, dict) and all(key in data for key in LEGACY_COMMENT_KEYS)
 
 
 def _normalize_free_listener_value(value: Any) -> list[str]:
@@ -187,6 +196,9 @@ def _build_metadata_payload(
                 payload = _empty_comment_payload()
         else:
             payload = _empty_comment_payload()
+
+        for payload_key, default_value in _empty_comment_payload().items():
+            payload.setdefault(payload_key, default_value)
 
         for key, value in comment_updates.items():
             payload[key] = _normalize_comment_value(key, value)

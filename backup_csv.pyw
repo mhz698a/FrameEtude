@@ -35,6 +35,7 @@ COLUMNS = [
     ("After of...", "after_of_episode"),
     ("Sobrescritura 1", "overwrite_1_times"),
     ("Sobrescritura 2", "overwrite_2_times"),
+    ("Sobrescritura Anacrónica", "overwrite_anachronic_times"),
     ("Sobrescritura 3", "overwrite_3_times"),
     ("Free listener", "free_listener_times"),
 ]
@@ -87,6 +88,9 @@ def get_file_metadata(path):
     metadata["after_of_episode"] = comment_display_value(comment_raw, "after_of_episode")
     metadata["overwrite_1_times"] = comment_display_value(comment_raw, "overwrite_1_times")
     metadata["overwrite_2_times"] = comment_display_value(comment_raw, "overwrite_2_times")
+    metadata["overwrite_anachronic_times"] = comment_display_value(
+        comment_raw, "overwrite_anachronic_times"
+    )
     metadata["overwrite_3_times"] = comment_display_value(comment_raw, "overwrite_3_times")
     metadata["free_listener_times"] = comment_display_value(comment_raw, "free_listener_times")
 
