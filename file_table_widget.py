@@ -40,11 +40,17 @@ class FolderScanThread(QtCore.QThread):
     def run(self):
         rows = []
         try:
+            entries = []
             with os.scandir(self.folder_path) as scan:
-                entries = [entry for entry in scan if entry.is_file()]
+                for entry in scan:
+                    if self.isInterruptionRequested():
+                        break
+                    if entry.is_file():
+                        entries.append(entry)
 
-            sort_key = windows_sort_key()
-            entries.sort(key=lambda entry: sort_key(entry.name))
+            if not self.isInterruptionRequested():
+                sort_key = windows_sort_key()
+                entries.sort(key=lambda entry: sort_key(entry.name))
 
             allowed_extensions = {
                 ".mp4", ".m4v", ".mov", ".mkv", ".avi", ".wmv", ".flv"
@@ -342,8 +348,11 @@ class FileTableWidget(QtWidgets.QTableWidget):
             return
 
         row_path = row_data.get("full_path", "")
-        if row_path and os.path.dirname(row_path) != self._current_folder:
-            return
+        if row_path:
+            row_folder = os.path.normcase(os.path.normpath(os.path.dirname(row_path)))
+            current_folder = os.path.normcase(os.path.normpath(self._current_folder))
+            if row_folder != current_folder:
+                return
 
         self._append_row_data(row_data)
         self.row_count_changed.emit(self.rowCount())
