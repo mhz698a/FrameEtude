@@ -225,7 +225,10 @@ class FramePlayerPanel(QtWidgets.QWidget):
         if not hasattr(main, "check_curtain") or main.check_curtain is None:
             main.check_curtain = QtWidgets.QCheckBox()
             main.check_curtain.hide()
-            main.check_curtain.setChecked(True)
+            main.check_curtain.setChecked(False)
+
+        # El estado de la cortina controla el overlay aunque el checkbox no sea visible.
+        main.check_curtain.toggled.connect(main.update_curtain_visibility)
 
         if not hasattr(main, "check_always_on_top") or main.check_always_on_top is None:
             main.check_always_on_top = QtWidgets.QCheckBox()
