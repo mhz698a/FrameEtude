@@ -333,9 +333,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         self._active_folder_scan = thread
         thread.row_ready.connect(self._on_folder_scan_row)
         thread.scan_finished.connect(self._on_folder_scan_finished)
-        thread.finished.connect(
-            lambda t=thread: self._on_folder_scan_thread_finished(t)
-        )
+        thread.finished.connect(self._on_folder_scan_thread_finished)
         thread.finished.connect(thread.deleteLater)
         thread.start()
 
@@ -361,7 +359,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
             return
         self._finish_folder_load(generation, folder_path, rows, cache_result=True)
 
-    def _on_folder_scan_thread_finished(self, thread: FolderScanThread) -> None:
+    def _on_folder_scan_thread_finished(self) -> None:
+        thread = self.sender()
         if self._active_folder_scan is thread:
             self._active_folder_scan = None
         self._start_pending_folder_scan()
