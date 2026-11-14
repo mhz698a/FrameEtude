@@ -429,7 +429,6 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         self.ensure_workframe_visible()
         self.start_worker_and_open(video_path)
-        self.check_curtain.setChecked(False)
 
     
     def rescan_selected_row(self):
@@ -490,7 +489,6 @@ class VideoEtude(QtWidgets.QMainWindow):
             return
         self.ensure_workframe_visible()
         self.start_worker_and_open(path)
-        self.check_curtain.setChecked(False)
 
     def start_worker_and_open(self, path):
         if self.worker_thread is not None:
@@ -558,19 +556,33 @@ class VideoEtude(QtWidgets.QMainWindow):
                 QtGui.QImage.Format.Format_RGB888,
             )
             self.frame_canvas.set_frame_image(image)
+            self.update_curtain_geometry()
         except Exception as error:
             self.frame_canvas.clear_frame()
             self.status.setText(f"No se pudo mostrar el fotograma: {error}")
 
     # ---------------- Single-frame layout & curtain ----------------
     def update_curtain_geometry(self):
-        width = self.frame_viewport.width()
-        height = self.frame_viewport.height()
-        if width <= 0 or height <= 0:
+        if not hasattr(self, "curtain") or not hasattr(self, "frame_canvas"):
             return
 
-        # La cortina cubre el área completa del visor, no el tamaño de una miniatura.
-        self.curtain.set_geometry_height(0, 0, width, height)
+        image_rect = self.frame_canvas.displayed_image_rect()
+        if image_rect.isEmpty():
+            self.curtain.hide()
+            return
+
+        # Align the curtain with the rendered image, excluding the canvas letterboxing.
+        image_origin = self.frame_canvas.mapTo(
+            self.frame_viewport,
+            image_rect.topLeft(),
+        )
+        self.curtain.set_geometry_height(
+            image_origin.x(),
+            image_origin.y(),
+            image_rect.width(),
+            image_rect.height(),
+        )
+
         if self.check_curtain.isChecked():
             self.curtain.show()
             self.curtain.raise_()
