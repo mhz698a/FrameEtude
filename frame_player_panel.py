@@ -19,46 +19,59 @@ class FrameViewport(QtWidgets.QWidget):
             self.main.update_curtain_geometry()
 
 
-class FrameDisplayLabel(QtWidgets.QLabel):
-    """Single-frame viewer that keeps the source image and scales it on resize."""
+class FrameCanvas(QtWidgets.QWidget):
+    """QSS-aware frame canvas that paints the video image after its styled background."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._frame_image = QtGui.QImage()
-        self.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.setMinimumSize(0, 0)
         self.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding,
         )
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet("background-color: rgb(18,18,18); border: none;")
 
     def set_frame_image(self, image):
         self._frame_image = image.copy() if image is not None else QtGui.QImage()
-        self._render_frame()
+        self.update()
 
     def clear_frame(self):
         self._frame_image = QtGui.QImage()
-        self.clear()
+        self.update()
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._render_frame()
+    def paintEvent(self, event):
+        option = QtWidgets.QStyleOption()
+        option.initFrom(self)
 
-    def _render_frame(self):
+        painter = QtGui.QPainter(self)
+        self.style().drawPrimitive(
+            QtWidgets.QStyle.PrimitiveElement.PE_Widget,
+            option,
+            painter,
+            self,
+        )
+
         if self._frame_image.isNull():
             return
 
-        target_size = self.contentsRect().size()
-        if target_size.width() <= 0 or target_size.height() <= 0:
+        area = self.contentsRect()
+        if area.width() <= 0 or area.height() <= 0:
             return
 
-        pixmap = QtGui.QPixmap.fromImage(self._frame_image).scaled(
-            target_size,
+        scaled_size = self._frame_image.size().scaled(
+            area.size(),
             QtCore.Qt.AspectRatioMode.KeepAspectRatio,
-            QtCore.Qt.TransformationMode.SmoothTransformation,
         )
-        self.setPixmap(pixmap)
+        target = QtCore.QRect(
+            area.x() + (area.width() - scaled_size.width()) // 2,
+            area.y() + (area.height() - scaled_size.height()) // 2,
+            scaled_size.width(),
+            scaled_size.height(),
+        )
+        painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
+        painter.drawImage(target, self._frame_image)
 
 
 class FramePlayerPanel(QtWidgets.QWidget):
@@ -134,8 +147,8 @@ class FramePlayerPanel(QtWidgets.QWidget):
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding,
         )
-        main.frame_label = FrameDisplayLabel(main.frame_viewport)
-        main.frame_layout.addWidget(main.frame_label, 1)
+        main.frame_canvas = FrameCanvas(main.frame_viewport)
+        main.frame_layout.addWidget(main.frame_canvas, 1)
         video_box_layout.addWidget(main.frame_viewport, 1)
 
         # Contenedor del slider con fondo negro y estilo azul
