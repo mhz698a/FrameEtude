@@ -1,30 +1,65 @@
 # frame_player_panel.py
-from PyQt6 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 from curtain_lib import CurtainOverlay
 from ocr_lib import SelectionOverlay
-import config
 
-class ThumbContainer(QtWidgets.QWidget):
+class FrameViewport(QtWidgets.QWidget):
     def __init__(self, main_window, parent=None):
         super().__init__(parent)
         self.main = main_window
-        self._last_height = 0
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        try:
-            self.main.selection_overlay.setGeometry(0, 0, self.width(), self.height())
+        overlay = getattr(self.main, "selection_overlay", None)
+        if overlay is not None:
+            overlay.setGeometry(self.rect())
+
+        if getattr(self.main, "curtain", None) is not None:
             self.main.update_curtain_geometry()
-            
-            # Recalcular tamaño de los fotogramas si la altura cambia
-            current_h = self.height()
-            if abs(current_h - self._last_height) > 2:
-                self._last_height = current_h
-                if hasattr(self.main, "refresh_thumbnails_size"):
-                    QtCore.QTimer.singleShot(10, self.main.refresh_thumbnails_size)
-        except Exception:
-            pass
+
+
+class FrameDisplayLabel(QtWidgets.QLabel):
+    """Single-frame viewer that keeps the source image and scales it on resize."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._frame_image = QtGui.QImage()
+        self.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.setMinimumSize(0, 0)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
+        self.setStyleSheet("background-color: rgb(18,18,18); border: none;")
+
+    def set_frame_image(self, image):
+        self._frame_image = image.copy() if image is not None else QtGui.QImage()
+        self._render_frame()
+
+    def clear_frame(self):
+        self._frame_image = QtGui.QImage()
+        self.clear()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._render_frame()
+
+    def _render_frame(self):
+        if self._frame_image.isNull():
+            return
+
+        target_size = self.contentsRect().size()
+        if target_size.width() <= 0 or target_size.height() <= 0:
+            return
+
+        pixmap = QtGui.QPixmap.fromImage(self._frame_image).scaled(
+            target_size,
+            QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+            QtCore.Qt.TransformationMode.SmoothTransformation,
+        )
+        self.setPixmap(pixmap)
+
 
 class FramePlayerPanel(QtWidgets.QWidget):
     def __init__(self, main_window):
@@ -88,18 +123,20 @@ class FramePlayerPanel(QtWidgets.QWidget):
         """)
         video_box_layout.addWidget(main.info_label)
 
-        main.thumb_container = ThumbContainer(main)
-        main.thumb_container.setStyleSheet(
-            "border: 1px solid #2b2b2b; border: none;"
+        main.frame_viewport = FrameViewport(main)
+        main.frame_viewport.setStyleSheet(
+            "background-color: rgb(18,18,18); border: none;"
         )
-        main.thumb_layout = QtWidgets.QHBoxLayout(main.thumb_container)
-        main.thumb_layout.setContentsMargins(0, 0, 0, 0)
-        main.thumb_layout.setSpacing(config.THUMB_SPACING)
-        main.thumb_container.setSizePolicy(
+        main.frame_layout = QtWidgets.QHBoxLayout(main.frame_viewport)
+        main.frame_layout.setContentsMargins(0, 0, 0, 0)
+        main.frame_layout.setSpacing(0)
+        main.frame_viewport.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding,
         )
-        video_box_layout.addWidget(main.thumb_container)
+        main.frame_label = FrameDisplayLabel(main.frame_viewport)
+        main.frame_layout.addWidget(main.frame_label, 1)
+        video_box_layout.addWidget(main.frame_viewport, 1)
 
         # Contenedor del slider con fondo negro y estilo azul
         slider_wrapper = QtWidgets.QWidget()
@@ -172,12 +209,6 @@ class FramePlayerPanel(QtWidgets.QWidget):
 
         controls_layout.addStretch(1) # Centrar a la izquierda
 
-        # Checkboxes lógicos requeridos por la ventana principal por compatibilidad
-        if not hasattr(main, "check_adjacent") or main.check_adjacent is None:
-            main.check_adjacent = QtWidgets.QCheckBox()
-            main.check_adjacent.hide()
-            main.check_adjacent.setChecked(False)
-
         if not hasattr(main, "check_curtain") or main.check_curtain is None:
             main.check_curtain = QtWidgets.QCheckBox()
             main.check_curtain.hide()
@@ -201,11 +232,6 @@ class FramePlayerPanel(QtWidgets.QWidget):
         menu_options.addAction("Cut", main.show_cut_dialog)
         
         menu_options.addSeparator()
-
-        action_adj = menu_options.addAction("Mostrar adyacentes")
-        action_adj.setCheckable(True)
-        action_adj.setChecked(main.check_adjacent.isChecked())
-        action_adj.toggled.connect(lambda checked: (main.check_adjacent.setChecked(checked), main.update_thumbs_visibility()))
 
         action_curt = menu_options.addAction("Hide")
         action_curt.setCheckable(True)
@@ -273,20 +299,9 @@ class FramePlayerPanel(QtWidgets.QWidget):
 
         layout.addLayout(video_box_layout, 1)
 
-        main.thumb_labels = []
-        for _ in range(config.NUM_THUMBS):
-            lbl = QtWidgets.QLabel()
-            lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            lbl.setStyleSheet("background-color: rgb(18,18,18); border: none;")
-            lbl.setSizePolicy(
-                QtWidgets.QSizePolicy.Policy.Fixed,
-                QtWidgets.QSizePolicy.Policy.Fixed,
-            )
-            main.thumb_labels.append(lbl)
-
-        main.curtain = CurtainOverlay(main.thumb_container)
+        main.curtain = CurtainOverlay(main.frame_viewport)
         main.curtain.hide()
 
-        main.selection_overlay = SelectionOverlay(main.thumb_container)
-        main.selection_overlay.setGeometry(0, 0, 800, 200)
+        main.selection_overlay = SelectionOverlay(main.frame_viewport)
+        main.selection_overlay.setGeometry(main.frame_viewport.rect())
         main.selection_overlay.selection_made.connect(main._on_selection_made)

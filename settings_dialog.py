@@ -65,26 +65,6 @@ class SettingsDialog(QtWidgets.QDialog):
         self.gen_tab = QtWidgets.QWidget()
         self.gen_layout = QtWidgets.QFormLayout(self.gen_tab)
         
-        self.thumb_width = QtWidgets.QSpinBox()
-        self.thumb_width.setRange(100, 2000)
-        self.thumb_width.setValue(config.DEFAULT_THUMB_WIDTH)
-        self.gen_layout.addRow("Default Thumb Width:", self.thumb_width)
-        
-        self.min_thumb_width = QtWidgets.QSpinBox()
-        self.min_thumb_width.setRange(50, 1000)
-        self.min_thumb_width.setValue(config.MIN_THUMB_WIDTH)
-        self.gen_layout.addRow("Min Thumb Width:", self.min_thumb_width)
-        
-        self.num_thumbs = QtWidgets.QSpinBox()
-        self.num_thumbs.setRange(1, 15)
-        self.num_thumbs.setValue(config.NUM_THUMBS)
-        self.gen_layout.addRow("Number of Thumbs:", self.num_thumbs)
-        
-        self.thumb_spacing = QtWidgets.QSpinBox()
-        self.thumb_spacing.setRange(0, 50)
-        self.thumb_spacing.setValue(config.THUMB_SPACING)
-        self.gen_layout.addRow("Thumb Spacing:", self.thumb_spacing)
-        
         self.cache_size = QtWidgets.QSpinBox()
         self.cache_size.setRange(1, 100)
         self.cache_size.setValue(config.CACHE_SIZE)
@@ -221,10 +201,6 @@ class SettingsDialog(QtWidgets.QDialog):
         
         # Empaquetar datos generales
         new_general = {
-            "DEFAULT_THUMB_WIDTH": int(self.thumb_width.value()),
-            "MIN_THUMB_WIDTH": int(self.min_thumb_width.value()),
-            "NUM_THUMBS": int(self.num_thumbs.value()),
-            "THUMB_SPACING": int(self.thumb_spacing.value()),
             "CACHE_SIZE": int(self.cache_size.value()),
             "CONTROL_WIDTH_ESTIMATE": int(self.control_width.value()),
             "RENAME_DIALOG_SCRIPT": str(self.rename_script.text()),

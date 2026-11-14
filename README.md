@@ -4,7 +4,8 @@ Una aplicación de escritorio moderna para **navegar, inspeccionar y recortar vi
 
 ## ☀️ Características Principales
 
-- **Navegador de fotogramas**: Visualiza y navega por los fotogramas de tus videos de forma fluida
+- **Visor de fotograma único**: muestra el fotograma actual ajustado al área disponible y se redimensiona automáticamente con el `QSplitter`.
+- **Navegador de fotogramas**: navega por el video fotograma a fotograma
 - **Recortador de video**: Extrae segmentos específicos de tus videos con precisión
 - **OCR integrado**: Extrae texto de fotogramas usando Tesseract con preprocesamiento adaptativo
 - **Gestor de metadatos**: Edita y organiza información de episodios y temporadas
@@ -101,9 +102,7 @@ OCR_LANG = 'spa'           # Idioma (esp, eng, etc.)
 
 ```toml
 [general]
-BASE_INTERNAL_ROOT = "E:\_Internal"
-DEFAULT_THUMB_WIDTH = 700
-NUM_THUMBS = 5
+BASE_INTERNAL_ROOT = "E:\\_Internal"
 CACHE_SIZE = 15
 ```
 

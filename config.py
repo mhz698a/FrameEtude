@@ -17,7 +17,6 @@ APP_DIR = Path(__file__).resolve().parent.as_posix()
 ICON_PATH_LIRYCS = f"{APP_DIR}/assets/lyricsbook.ico"
 ICON_PATH = f"{APP_DIR}/assets/frameetude.ico"
 VIDEO_EXTS = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv'}
-THUMB_ASPECT = 9/16
 VALID_FOLDER_SUFFIXES = ("lyrics", "wroad", "writed")
 
 APPDATA_DIR = Path(os.getenv("APPDATA", USER_HOME)) / APP_NAME
@@ -42,10 +41,6 @@ DEFAULT_SETTINGS = {
     "OVERWRITE_DATABASE": "",
     "SEASON_DATABASE": "",
     "BASE_INTERNAL_ROOT": r"E:\_Internal", # Ajuste parametrado para sistema local
-    "DEFAULT_THUMB_WIDTH": 700,
-    "MIN_THUMB_WIDTH": 120,
-    "NUM_THUMBS": 5,
-    "THUMB_SPACING": 8,
     "CONTROL_WIDTH_ESTIMATE": 240,
     "CACHE_SIZE": 15, # tamaño máximo del cache LRU (afecta rendimiento de CPU/RAM)
     "BACKUP_PATH": os.environ.get("OneDrive") or (USER_HOME / "Documents").as_posix(),
@@ -113,6 +108,15 @@ def update_and_save(ocr_data, general_data):
 # --- Cargar datos inicialmente desde el archivo ---
 load_settings()
 
+# The single-frame viewer no longer uses the legacy multi-thumbnail settings.
+for obsolete_key in (
+    "DEFAULT_THUMB_WIDTH",
+    "MIN_THUMB_WIDTH",
+    "NUM_THUMBS",
+    "THUMB_SPACING",
+):
+    _C["general"].pop(obsolete_key, None)
+
 # --- Exposición de variables con tus conversiones de tipo explícitas ---
 OCR_SCALE = int(_C["ocr"]["OCR_SCALE"])
 OCR_USE_CLAHE = bool(_C["ocr"]["OCR_USE_CLAHE"])       
@@ -129,10 +133,6 @@ OVERWRITE_DATABASE = str(_C["general"]["OVERWRITE_DATABASE"])
 SEASON_DATABASE = str(_C["general"]["SEASON_DATABASE"])
 BASE_INTERNAL_ROOT = str(_C["general"]["BASE_INTERNAL_ROOT"])
 
-DEFAULT_THUMB_WIDTH = int(_C["general"]["DEFAULT_THUMB_WIDTH"])
-MIN_THUMB_WIDTH = int(_C["general"]["MIN_THUMB_WIDTH"])
-NUM_THUMBS = int(_C["general"]["NUM_THUMBS"])
-THUMB_SPACING = int(_C["general"]["THUMB_SPACING"])
 CONTROL_WIDTH_ESTIMATE = int(_C["general"]["CONTROL_WIDTH_ESTIMATE"])
 CACHE_SIZE = int(_C["general"]["CACHE_SIZE"])
 BACKUP_PATH = str(_C["general"]["BACKUP_PATH"])
