@@ -267,7 +267,7 @@ class FramePlayerPanel(QtWidgets.QWidget):
         action_curt = menu_options.addAction("Hide")
         action_curt.setCheckable(True)
         action_curt.setChecked(main.check_curtain.isChecked())
-        action_curt.toggled.connect(lambda checked: (main.check_curtain.setChecked(checked), main.update_curtain_visibility()))
+        action_curt.toggled.connect(main.check_curtain.setChecked)
 
         action_top = menu_options.addAction("Always on top")
         action_top.setCheckable(True)
