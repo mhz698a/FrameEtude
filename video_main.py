@@ -24,152 +24,8 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.lyric_mode = False
         self.setWindowTitle("FrameEtude")
         self.resize(1300, 620)
-
-        # central layout: left panel + right main area
-        w = QtWidgets.QWidget()
-        self.setCentralWidget(w)
-        self.main_layout = QtWidgets.QHBoxLayout(w)
-        self.main_layout.setContentsMargins(8,8,8,8)
-        self.main_layout.setSpacing(0)
+        self._build_ui()
         
-        self.splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
-        self.splitter.setHandleWidth(6)
-        self.splitter.setStyleSheet("""
-            QSplitter::handle {
-                background-color: #2b2b2b;
-            }
-            QSplitter::handle:hover {
-                background-color: #05478a;
-            }
-        """)
-        self.main_layout.addWidget(self.splitter)
-
-        # ---------------- Left panel ----------------
-        self.left_panel = QtWidgets.QWidget()
-        self.left_panel.setMinimumWidth(400)
-        left_layout = QtWidgets.QVBoxLayout(self.left_panel)
-        left_layout.setContentsMargins(4,4,4,4)
-        left_layout.setSpacing(6)
-        
-        self.combo_year = QtWidgets.QComboBox()
-        self.combo_year.setFixedWidth(60)
-        self.combo_year.currentIndexChanged.connect(self.on_year_changed)
-        self.combo_year.setVisible(False)
-        
-        self.year_selector_bar = YearSelectorBar()
-        self.year_selector_bar.yearSelected.connect(self.on_year_bar_selected)
-        self.year_selector_bar.hiddenYearSelected.connect(self.on_hidden_year_selected)
-        self.year_selector_bar.createNewYearRequested.connect(self.on_create_new_year_requested)
-        
-        self.folder_selector_bar = FolderSelectorBar()
-        self.folder_selector_bar.folderSelected.connect(self.on_master_changed)
-        self.folder_selector_bar.folderChanged.connect(
-            lambda: self.on_year_changed(self.combo_year.currentIndex())
-        )
-        
-        # -------------------------------------
-             
-        self.master_toolbar = MasterToolBar(self)
-                
-        self.master_toolbar.add_simplified_action("Hide/Show Workframe", self.toggle_workframe_visibility)
-        self.master_toolbar.add_simplified_action("Settings", self.open_settings_dialog)
-        self.master_toolbar.add_simplified_action("Open other video", self.open_video_dialog)
-        self.master_toolbar.add_simplified_action("Refresh", self.rescan_current_master_folder)
-        self.master_toolbar.add_simplified_action("Backup", self.run_backup_csv)
-        self.master_toolbar.add_simplified_action("Etude", self.open_etude_file)
-        self.master_toolbar.add_dropdown_button(
-            "Get Ov Reg",
-            [
-                ("Get Ov1 Reg", lambda: self.get_reg_ov_temp("1")),
-                ("Get Ov2 Reg", lambda: self.get_reg_ov_temp("2")),
-            ]
-        )
-        self.master_toolbar.add_simplified_action("Get Titles Ep", self.get_episode_titles_temp)
-        self.master_toolbar.add_simplified_action("Gen Plan.md", self.phase_gen_exec)
-        self.btn_check = self.master_toolbar.add_simplified_action(
-            "Check MD", self.open_lyrics_manager, object_name="CheckMDButton", enabled=False
-        )
-        self.master_toolbar.add_dropdown_button(
-            "Overwrite",
-            [
-                ("Overwrite P", lambda: self.showOverwriteInfo("ov_0")),
-                ("Overwrite I", lambda: self.showOverwriteInfo("ov_1")),
-                ("Overwrite II", lambda: self.showOverwriteInfo("ov_2")),
-                ("Overwrite III", lambda: self.showOverwriteInfo("ov_3")),
-            ]
-        )
-        self.action_load_selected = self.master_toolbar.add_simplified_action(
-            "Load to Workframe", self.load_selected_file, enabled=False
-        )
-        self.master_toolbar.add_simplified_action("Check SMB", self.open_smb_dialog)
-        self.master_toolbar.add_simplified_action("About", self.open_about_dialog)
-        self.chk_lyric = self.master_toolbar.add_simplified_action(
-            "View Lyrics?", self.on_lyric_checkbox_toggled, checkable=True, enabled=False
-        )
-        
-        left_layout.addWidget(self.master_toolbar)
-        
-        # ---------------------------------------
-        
-        self.file_table = FileTableWidget()
-        self.file_table.itemSelectionChanged.connect(self.on_file_selected)
-        self.file_table.row_count_changed.connect(self.on_file_count_changed)
-        
-        files_row = QtWidgets.QHBoxLayout()
-        files_row.setSpacing(6)
-        
-        files_row.addWidget(self.year_selector_bar)
-        files_row.addWidget(self.folder_selector_bar)
-        files_row.addWidget(self.file_table, 1)
-        left_layout.addLayout(files_row, 1)
-        
-        # ---------------- Fila única de Progreso y Conteo ----------------
-        
-        progress_row = QtWidgets.QHBoxLayout()
-        progress_row.setContentsMargins(5, 5, 5, 5)
-        progress_row.setSpacing(8)
-        
-        self.folder_count_label = QtWidgets.QLabel("0 MediaFiles")
-        self.folder_count_label.setStyleSheet("""
-            color: white;
-            background: #4f4f4f;
-            border-radius: 4px;
-            padding: 4px 8px;
-            font-style: italic;
-        """)
-        progress_row.addWidget(self.folder_count_label)
-        
-        self.metadata_progress_label = QtWidgets.QLabel("0/0")
-        progress_row.addWidget(self.metadata_progress_label)
-
-        self.metadata_progress_bar = QtWidgets.QProgressBar()
-        self.metadata_progress_bar.setRange(0, 100)
-        self.metadata_progress_bar.setValue(0)
-        progress_row.addWidget(self.metadata_progress_bar, 1)
-        
-        left_layout.addLayout(progress_row)
-        
-        self.file_table.set_progress_widgets(
-            self.metadata_progress_bar,
-            self.metadata_progress_label,
-        )
-    
-        # ---------------- Right main area ----------------
-        
-        self.right_widget = QtWidgets.QWidget()
-        self.right_stack = QtWidgets.QStackedLayout(self.right_widget)
-
-        self.frame_player_panel = FramePlayerPanel(self)
-        self.lyric_panel = LyricVisionPanel(self)
-
-        self.right_stack.addWidget(self.frame_player_panel)
-        self.right_stack.addWidget(self.lyric_panel)
-        self.right_stack.setCurrentWidget(self.frame_player_panel)
-        
-        self.splitter.addWidget(self.left_panel)
-        self.splitter.addWidget(self.right_widget)
-        self.splitter.setSizes([660, 640])
-
         # ----------------- video state ----------------------
         self.cap = None
         self.fps = 25.0
@@ -206,6 +62,147 @@ class VideoEtude(QtWidgets.QMainWindow):
         except Exception:
             pass
 
+    def _build_ui(self):
+        # 1. LAYOUT PRINCIPAL VERTICAL (Ventana entera)
+        w = QtWidgets.QWidget()
+        self.setCentralWidget(w)
+        self.main_layout = QtWidgets.QVBoxLayout(w)
+        self.main_layout.setContentsMargins(8, 8, 8, 8)
+        self.main_layout.setSpacing(6)
+        
+        # ---------------- ARRIBA: MasterToolBar Global ----------------
+        self.master_toolbar = MasterToolBar(self)
+        
+        self.master_toolbar.add_simplified_action("Settings", self.open_settings_dialog)
+        self.master_toolbar.add_simplified_action("Open other video", self.open_video_dialog)
+        self.master_toolbar.add_simplified_action("Refresh", self.rescan_current_master_folder)
+        self.master_toolbar.add_simplified_action("Backup", self.run_backup_csv)
+        self.master_toolbar.add_simplified_action("Etude", self.open_etude_file)
+        self.master_toolbar.add_dropdown_button("Get Ov Reg",
+            [
+                ("Get Ov1 Reg", lambda: self.get_reg_ov_temp("1")),
+                ("Get Ov2 Reg", lambda: self.get_reg_ov_temp("2")),
+            ]
+        )
+        self.master_toolbar.add_simplified_action("Get Titles Ep", self.get_episode_titles_temp)
+        self.master_toolbar.add_simplified_action("Gen Plan.md", self.phase_gen_exec)
+        self.btn_check = self.master_toolbar.add_simplified_action(
+            "Check MD", self.open_lyrics_manager, object_name="CheckMDButton", enabled=False
+        )
+        self.master_toolbar.add_dropdown_button("Overwrite",
+            [
+                ("Overwrite P", lambda: self.showOverwriteInfo("ov_0")),
+                ("Overwrite I", lambda: self.showOverwriteInfo("ov_1")),
+                ("Overwrite II", lambda: self.showOverwriteInfo("ov_2")),
+                ("Overwrite III", lambda: self.showOverwriteInfo("ov_3")),
+            ]
+        )
+        self.action_load_selected = self.master_toolbar.add_simplified_action(
+            "Load to Workframe", self.load_selected_file, enabled=False
+        )
+        self.master_toolbar.add_simplified_action("Check SMB", self.open_smb_dialog)
+        self.master_toolbar.add_simplified_action("About", self.open_about_dialog)
+        self.chk_lyric = self.master_toolbar.add_simplified_action(
+            "View Lyrics?", self.on_lyric_checkbox_toggled, checkable=True, enabled=False
+        )
+        
+        # Añadir la barra arriba de todo en la ventana principal
+        self.main_layout.addWidget(self.master_toolbar)
+
+        # ---------------- CENTRO: Splitter (Panel Izquierdo + Reproductor) ----------------
+        self.splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
+        self.splitter.setHandleWidth(6)
+        self.splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #2b2b2b;
+            }
+            QSplitter::handle:hover {
+                background-color: #05478a;
+            }
+        """)
+        self.main_layout.addWidget(self.splitter, 1) # Stretch para que ocupe el espacio central
+
+        # --- Panel Izquierdo (Selectores y tabla) ---
+        self.left_panel = QtWidgets.QWidget()
+        self.left_panel.setMinimumWidth(400)
+        left_layout = QtWidgets.QVBoxLayout(self.left_panel)
+        left_layout.setContentsMargins(4, 4, 4, 4)
+        left_layout.setSpacing(6)
+        
+        self.year_selector_bar = YearSelectorBar()
+        self.year_selector_bar.yearSelected.connect(self.on_year_bar_selected)
+        self.year_selector_bar.hiddenYearSelected.connect(self.on_hidden_year_selected)
+        self.year_selector_bar.createNewYearRequested.connect(self.on_create_new_year_requested)
+        
+        self.folder_selector_bar = FolderSelectorBar()
+        self.folder_selector_bar.folderSelected.connect(self.on_master_changed)
+        self.folder_selector_bar.folderChanged.connect(
+            lambda: self.load_year_data(self.year_selector_bar.current_year())
+        )
+        
+        self.file_table = FileTableWidget()
+        self.file_table.itemSelectionChanged.connect(self.on_file_selected)
+        self.file_table.row_count_changed.connect(self.on_file_count_changed)
+        
+        files_row = QtWidgets.QHBoxLayout()
+        files_row.setSpacing(6)
+        files_row.addWidget(self.year_selector_bar)
+        files_row.addWidget(self.folder_selector_bar)
+        files_row.addWidget(self.file_table, 1)
+        
+        left_layout.addLayout(files_row, 1)
+
+        # --- Right main area (Reproductor / Panel derecho) ---
+        self.right_widget = QtWidgets.QWidget()
+        self.right_stack = QtWidgets.QStackedLayout(self.right_widget)
+
+        self.frame_player_panel = FramePlayerPanel(self)
+        self.lyric_panel = LyricVisionPanel(self)
+
+        self.right_stack.addWidget(self.frame_player_panel)
+        self.right_stack.addWidget(self.lyric_panel)
+        self.right_stack.setCurrentWidget(self.frame_player_panel)
+        
+        # Agregar paneles al splitter
+        self.splitter.addWidget(self.left_panel)
+        self.splitter.addWidget(self.right_widget)
+        self.splitter.setSizes([660, 640])
+
+        # ---------------- ABAJO: Progress Row Global ----------------
+        progress_row = QtWidgets.QHBoxLayout()
+        progress_row.setContentsMargins(5, 5, 5, 5)
+        progress_row.setSpacing(8)
+        
+        self.folder_count_label = QtWidgets.QLabel("0 MediaFiles")
+        self.folder_count_label.setStyleSheet("""
+            color: white;
+            background: #4f4f4f;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-style: italic;
+        """)
+        progress_row.addWidget(self.folder_count_label)
+        
+        self.metadata_progress_label = QtWidgets.QLabel("0/0")
+        progress_row.addWidget(self.metadata_progress_label)
+
+        self.metadata_progress_bar = QtWidgets.QProgressBar()
+        self.metadata_progress_bar.setRange(0, 100)
+        self.metadata_progress_bar.setValue(0)
+        progress_row.addWidget(self.metadata_progress_bar, 1)
+        
+        # Añadir la barra de progreso abajo del todo en la ventana principal
+        self.main_layout.addLayout(progress_row)
+        
+        self.file_table.set_progress_widgets(
+            self.metadata_progress_bar,
+            self.metadata_progress_label,
+        )
+        
+        self.status = QtWidgets.QLabel("FrameEtude Loaded Rerosurces")
+        self.main_layout.addWidget(self.status)
+        
+
     def showOverwriteInfo(self, key: str):
         times_num = get_overwrite_data(key)
         QtWidgets.QMessageBox.information(
@@ -231,45 +228,27 @@ class VideoEtude(QtWidgets.QMainWindow):
 
     # ---------------- Left panel helpers ----------------
     def populate_years(self, select_year_str: str = None):
-        # List actual folders in BASE_INTERNAL_ROOT that are numeric years >= 2004
+        # Listar carpetas reales en BASE_INTERNAL_ROOT que sean años numéricos >= 2004
         years = []
         try:
             for name in os.listdir(config.BASE_INTERNAL_ROOT):
-                # Verifica que sea número, tenga 4 dígitos y sea igual o mayor a 2004
                 if name.isdigit() and len(name) == 4 and int(name) >= 2004:
                     years.append(name)
             years.sort()
         except Exception:
             years = [str(y) for y in range(2004, datetime.date.today().year + 1)]
 
-        self.combo_year.blockSignals(True)
-        try:
-            self.combo_year.clear()
-            self.combo_year.addItems(years)
-        finally:
-            self.combo_year.blockSignals(False)
-
         self.year_selector_bar.set_years(years)
 
-        target_year = select_year_str if select_year_str else str(datetime.date.today().year)
-        idx = self.combo_year.findText(target_year)
-        if idx >= 0:
-            self.combo_year.setCurrentIndex(idx)
-            self.year_selector_bar.select_year(target_year, emit=False)
-            self.on_year_changed(idx)
+        target_year = select_year_str if select_year_str else (years[-1] if years else str(datetime.date.today().year))
+        
+        self.year_selector_bar.select_year(target_year, emit=False)
+        self.load_year_data(target_year)
     
     def on_year_bar_selected(self, year: str):
-        idx = self.combo_year.findText(year)
-        if idx < 0:
+        if not year:
             return
-
-        old = self.combo_year.blockSignals(True)
-        try:
-            self.combo_year.setCurrentIndex(idx)
-        finally:
-            self.combo_year.blockSignals(old)
-
-        self.on_year_changed(idx)
+        self.load_year_data(year)
         
     def on_hidden_year_selected(self, year: str):
         self.year_selector_bar.select_year("", emit=False)
@@ -277,7 +256,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         
     def on_create_new_year_requested(self):
         # Get the highest year currently in the interface
-        years = [self.combo_year.itemText(i) for i in range(self.combo_year.count())]
+        years = self.year_selector_bar.get_years()
         if not years:
             return
 
@@ -296,10 +275,6 @@ class VideoEtude(QtWidgets.QMainWindow):
                 self.populate_years(select_year_str=result)
             else:
                 QtWidgets.QMessageBox.warning(self, "Error", result)
-
-    def on_year_changed(self, idx):
-        year = self.combo_year.currentText()
-        self.load_year_data(year)
         
     def load_year_data(self, year: str):
         self.exit_lyric_mode(uncheck=True)
@@ -375,13 +350,13 @@ class VideoEtude(QtWidgets.QMainWindow):
         self.on_master_changed(path)
 
     def open_etude_file(self):
-        year = self.combo_year.currentText()
+        year = self.year_selector_bar.current_year()
         px = f"{int(year) - 2003:02d}"
         os.startfile(f"{'E:/_Internal'}/{year}/{px}. identity/{px}. le_etude.overwrite.xlsx")
 
     def phase_gen_exec(self):
         py_execute = sys.executable
-        year = self.combo_year.currentText()
+        year = self.year_selector_bar.current_year()
         cur_fr_script = os.path.dirname(os.path.abspath(__file__))
         child_script = os.path.join(cur_fr_script, "phase_gen.pyw")
         CREATE_NO_WINDOW = 0x08000000
@@ -395,7 +370,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         py_execute = sys.executable
         cur_fr_script = os.path.dirname(os.path.abspath(__file__))
         child_script = os.path.join(cur_fr_script, "temp_ov_dtrng.pyw")
-        year = self.combo_year.currentText()
+        year = self.year_selector_bar.current_year()
         CREATE_NO_WINDOW = 0x08000000
 
         subprocess.Popen(
@@ -407,7 +382,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         py_execute = sys.executable  
         cur_fr_script = os.path.dirname(os.path.abspath(__file__))
         child_script = os.path.join(cur_fr_script, "temp_eps_list_get.pyw")
-        year = self.combo_year.currentText()
+        year = self.year_selector_bar.current_year()
         CREATE_NO_WINDOW = 0x08000000
 
         subprocess.Popen(
@@ -416,7 +391,7 @@ class VideoEtude(QtWidgets.QMainWindow):
         )
 
     def open_about_dialog(self):
-        year = self.combo_year.currentText().strip()
+        year = self.year_selector_bar.current_year().strip()
         if not year or year == "(no encontrado)":
             QtWidgets.QMessageBox.information(self, "About", "No hay un año válido seleccionado.")
             return
@@ -597,12 +572,26 @@ class VideoEtude(QtWidgets.QMainWindow):
         return container_w
 
     def compute_thumb_size_for(self, visible_count):
-        avail = self.available_thumb_area_width()
+        container_h = self.thumb_container.height()
+        if container_h <= 50:
+            container_h = 300  # Altura por defecto si aún no se ha dibujado
+        
+        # Calcular el alto en base al espacio vertical disponible del contenedor
+        h = container_h
+        w = int(h / config.THUMB_ASPECT)
+        
+        # Validar que no rebase el ancho disponible en la pantalla
+        avail_w = self.available_thumb_area_width()
         if visible_count <= 0:
             visible_count = 1
         total_spacing = config.THUMB_SPACING * (visible_count - 1)
-        w = (avail - total_spacing) / visible_count
-        w = int(max(config.MIN_THUMB_WIDTH, min(config.DEFAULT_THUMB_WIDTH, w)))
+        max_w_by_width = (avail_w - total_spacing) / visible_count
+        
+        if w > max_w_by_width:
+            w = int(max_w_by_width)
+            h = int(w * config.THUMB_ASPECT)
+            
+        w = int(max(config.MIN_THUMB_WIDTH, w))
         h = int(w * config.THUMB_ASPECT)
         return w, h
 
@@ -638,6 +627,7 @@ class VideoEtude(QtWidgets.QMainWindow):
                 lbl.show()
             else:
                 lbl.hide()
+                
         self.thumb_container.update()
         self.update_curtain_geometry()
 
@@ -647,8 +637,13 @@ class VideoEtude(QtWidgets.QMainWindow):
 
     def update_curtain_geometry(self):
         visible_count = config.NUM_THUMBS if self.check_adjacent.isChecked() else 1
-        thumb_w, thumb_h = self.compute_thumb_size_for(visible_count)
-        w = max(self.thumb_container.width(), 10)
+        _, thumb_h = self.compute_thumb_size_for(visible_count)
+        
+        # Tomar el ancho completo del contenedor (thumb_container)
+        w = self.thumb_container.width()
+        if w <= 10 and self.thumb_container.parentWidget():
+            w = self.thumb_container.parentWidget().width()
+            
         self.curtain.set_geometry_height(0, 0, w, thumb_h)
         if self.check_curtain.isChecked():
             self.curtain.show()
@@ -662,13 +657,11 @@ class VideoEtude(QtWidgets.QMainWindow):
         except Exception:
             if hasattr(self, 'curtain') and hasattr(self, 'thumb_container'):
                 vis_count = config.NUM_THUMBS if getattr(self, 'check_adjacent', None) and self.check_adjacent.isChecked() else 1
-                w, h = self.compute_thumb_size_for(vis_count) if hasattr(self, 'compute_thumb_size_for') else (config.MIN_THUMB_WIDTH, int(config.MIN_THUMB_WIDTH * config.THUMB_ASPECT))
-                self.curtain.set_geometry_height(0, 0, max(self.thumb_container.width(), 10), h)
-                if getattr(self, 'check_curtain', None) and self.check_curtain.isChecked():
-                    self.curtain.show()
-                    self.curtain.raise_()
-                else:
-                    self.curtain.hide()
+                _, h = self.compute_thumb_size_for(vis_count)
+                w = self.thumb_container.width()
+                if w <= 10 and self.thumb_container.parentWidget():
+                    w = self.thumb_container.parentWidget().width()
+                self.curtain.set_geometry_height(0, 0, w, h)
         else:
             if hasattr(self, 'curtain') and self.check_curtain.isChecked():
                 self.curtain.raise_()

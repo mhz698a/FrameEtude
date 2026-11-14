@@ -5,6 +5,26 @@ from curtain_lib import CurtainOverlay
 from ocr_lib import SelectionOverlay
 import config
 
+class ThumbContainer(QtWidgets.QWidget):
+    def __init__(self, main_window, parent=None):
+        super().__init__(parent)
+        self.main = main_window
+        self._last_height = 0
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        try:
+            self.main.selection_overlay.setGeometry(0, 0, self.width(), self.height())
+            self.main.update_curtain_geometry()
+            
+            # Recalcular tamaño de los fotogramas si la altura cambia
+            current_h = self.height()
+            if abs(current_h - self._last_height) > 2:
+                self._last_height = current_h
+                if hasattr(self.main, "refresh_thumbnails_size"):
+                    QtCore.QTimer.singleShot(10, self.main.refresh_thumbnails_size)
+        except Exception:
+            pass
 
 class FramePlayerPanel(QtWidgets.QWidget):
     def __init__(self, main_window):
@@ -20,7 +40,7 @@ class FramePlayerPanel(QtWidgets.QWidget):
         
         self.setStyleSheet("""
             QPushButton, QToolButton { 
-                background-color: #3a3a3c; 
+                background-color: transparent; 
                 border: 1px solid #2b2b2d; 
                 padding: 6px 10px; 
                 border-radius: 6px; 
@@ -44,52 +64,113 @@ class FramePlayerPanel(QtWidgets.QWidget):
                 padding: 4px; 
                 color: #e6e6e6; 
                 border-radius: 4px; 
-                qproperty-alignment: 'AlignCenter'; /* <--- Esto centra tanto el texto como el placeholder */
+                qproperty-alignment: 'AlignCenter'; 
             }
         """)
 
         main.right_layout = layout
 
+        # --- Contenedor unificado: Título + Video + Slider + Controles ---
+        video_box_layout = QtWidgets.QVBoxLayout()
+        video_box_layout.setContentsMargins(0, 0, 0, 0)
+        video_box_layout.setSpacing(0)
+
+        # Etiqueta de nombre y duración con fondo negro y texto blanco
         main.info_label = QtWidgets.QLabel("Nombre - Duración")
         main.info_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(main.info_label)
+        main.info_label.setStyleSheet("""
+            background-color: black;
+            color: white;
+            padding: 6px;
+            font-weight: bold;
+            border: 1px solid #2b2b2b;
+            border-bottom: none;
+        """)
+        video_box_layout.addWidget(main.info_label)
 
-        main.thumb_container = QtWidgets.QWidget()
+        main.thumb_container = ThumbContainer(main)
+        main.thumb_container.setStyleSheet(
+            "border: 1px solid #2b2b2b; border: none;"
+        )
         main.thumb_layout = QtWidgets.QHBoxLayout(main.thumb_container)
         main.thumb_layout.setContentsMargins(0, 0, 0, 0)
         main.thumb_layout.setSpacing(config.THUMB_SPACING)
         main.thumb_container.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
-            QtWidgets.QSizePolicy.Policy.Fixed,
+            QtWidgets.QSizePolicy.Policy.Expanding,
         )
-        layout.addWidget(main.thumb_container)
+        video_box_layout.addWidget(main.thumb_container)
 
-        main.thumb_labels = []
-        for _ in range(config.NUM_THUMBS):
-            lbl = QtWidgets.QLabel()
-            lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            lbl.setStyleSheet("background-color: rgb(18,18,18); border: 1px solid #2b2b2b;")
-            lbl.setSizePolicy(
-                QtWidgets.QSizePolicy.Policy.Fixed,
-                QtWidgets.QSizePolicy.Policy.Fixed,
-            )
-            main.thumb_labels.append(lbl)
-
-        main.curtain = CurtainOverlay(main.thumb_container)
-        main.curtain.hide()
-
-        main.selection_overlay = SelectionOverlay(main.thumb_container)
-        main.selection_overlay.setGeometry(0, 0, 800, 200)
-        main.selection_overlay.selection_made.connect(main._on_selection_made)
+        # Contenedor del slider con fondo negro y estilo azul
+        slider_wrapper = QtWidgets.QWidget()
+        slider_wrapper.setStyleSheet("background-color: black; border: none")
+        slider_layout = QtWidgets.QHBoxLayout(slider_wrapper)
+        slider_layout.setContentsMargins(10, 8, 10, 8)
 
         main.video_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        main.video_slider.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        main.video_slider.setStyleSheet("""
+            QSlider {
+                border: none;
+                background: transparent;
+            }
+            QSlider::groove:horizontal {
+                background: #2b2b2b;
+                height: 6px;
+                border-radius: 3px;
+                border: none;
+            }
+            QSlider::sub-page:horizontal {
+                background: #2e88ff;
+                border-radius: 3px;
+            }
+            QSlider::sub-page:horizontal:hover {
+                background: #5ca2ff;
+            }
+            QSlider::sub-page:horizontal:pressed {
+                background: #80b8ff;
+            }
+            QSlider::add-page:horizontal {
+                background: #1e1e1f;
+                border-radius: 3px;
+            }
+            QSlider::handle:horizontal {
+                background: #ffffff;
+                border: 1px solid #2e88ff;
+                width: 14px;
+                margin-top: -4px;
+                margin-bottom: -4px;
+                border-radius: 7px;
+            }
+            QSlider::handle:horizontal:hover {
+                background: #5ca2ff;
+                border: 1px solid #5ca2ff;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: #80b8ff;
+                border: 1px solid #80b8ff;
+            }
+        """)
         main.video_slider.sliderReleased.connect(main.on_slider_released)
         main.video_slider.valueChanged.connect(main.on_slider_value_changed)
-        layout.addWidget(main.video_slider)
+        slider_layout.addWidget(main.video_slider)
+        video_box_layout.addWidget(slider_wrapper)
 
-        # Layout único para todos los controles en una sola línea horizontal
-        controls_layout = QtWidgets.QHBoxLayout()
+        # --- Contenedor de botones centrados con fondo negro ---
+        controls_wrapper = QtWidgets.QWidget()
+        controls_wrapper.setObjectName("ControlsWrapper")
+        controls_wrapper.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
+        controls_wrapper.setStyleSheet("""
+            #ControlsWrapper {
+                background-color: black;
+            }
+        """)
+        controls_layout = QtWidgets.QHBoxLayout(controls_wrapper)
+        controls_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignVCenter)
+        controls_layout.setContentsMargins(10, 8, 10, 8)
         controls_layout.setSpacing(6)
+
+        controls_layout.addStretch(1) # Centrar a la izquierda
 
         # Checkboxes lógicos requeridos por la ventana principal por compatibilidad
         if not hasattr(main, "check_adjacent") or main.check_adjacent is None:
@@ -142,6 +223,7 @@ class FramePlayerPanel(QtWidgets.QWidget):
         # Botón unificado -01s con menú desplegable lateral para saltos largos
         btn_neg = QtWidgets.QToolButton()
         btn_neg.setText("-01s")
+        btn_neg.setMinimumWidth(70)
         btn_neg.setPopupMode(QtWidgets.QToolButton.ToolButtonPopupMode.MenuButtonPopup)
         btn_neg.clicked.connect(lambda: main.move_seconds(-1))
         
@@ -154,23 +236,27 @@ class FramePlayerPanel(QtWidgets.QWidget):
 
         # Botón -Fr1
         btn_minus_fr1 = QtWidgets.QPushButton("-Fr1")
+        btn_minus_fr1.setMinimumHeight(35)
         btn_minus_fr1.clicked.connect(lambda: main.move_frame(-1))
         controls_layout.addWidget(btn_minus_fr1)
 
         # Campo de tiempo con placeholder
         main.entry_time = QtWidgets.QLineEdit()
         main.entry_time.setFixedWidth(120)
+        main.entry_time.setMinimumHeight(35)
         main.entry_time.setPlaceholderText("hh:mm:ss:ff")
         main.entry_time.returnPressed.connect(main.go_to_time)
         controls_layout.addWidget(main.entry_time)
 
         # Botón +Fr1
         btn_plus_fr1 = QtWidgets.QPushButton("+Fr1")
+        btn_plus_fr1.setMinimumHeight(35)
         btn_plus_fr1.clicked.connect(lambda: main.move_frame(1))
         controls_layout.addWidget(btn_plus_fr1)
 
         # Botón unificado +01s con menú desplegable lateral para saltos largos
         btn_pos = QtWidgets.QToolButton()
+        btn_pos.setMinimumWidth(70)
         btn_pos.setText("+01s")
         btn_pos.setPopupMode(QtWidgets.QToolButton.ToolButtonPopupMode.MenuButtonPopup)
         btn_pos.clicked.connect(lambda: main.move_seconds(1))
@@ -183,7 +269,24 @@ class FramePlayerPanel(QtWidgets.QWidget):
         controls_layout.addWidget(btn_pos)
 
         controls_layout.addStretch(1)
-        layout.addLayout(controls_layout)
+        video_box_layout.addWidget(controls_wrapper)
 
-        main.status = QtWidgets.QLabel("")
-        layout.addWidget(main.status)
+        layout.addLayout(video_box_layout, 1)
+
+        main.thumb_labels = []
+        for _ in range(config.NUM_THUMBS):
+            lbl = QtWidgets.QLabel()
+            lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            lbl.setStyleSheet("background-color: rgb(18,18,18); border: none;")
+            lbl.setSizePolicy(
+                QtWidgets.QSizePolicy.Policy.Fixed,
+                QtWidgets.QSizePolicy.Policy.Fixed,
+            )
+            main.thumb_labels.append(lbl)
+
+        main.curtain = CurtainOverlay(main.thumb_container)
+        main.curtain.hide()
+
+        main.selection_overlay = SelectionOverlay(main.thumb_container)
+        main.selection_overlay.setGeometry(0, 0, 800, 200)
+        main.selection_overlay.selection_made.connect(main._on_selection_made)
