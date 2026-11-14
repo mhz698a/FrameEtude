@@ -100,11 +100,15 @@ OCR_LANG = 'spa'           # Idioma (esp, eng, etc.)
 
 ### Parámetros generales disponibles
 
+`OVERWRITE_DATABASE` y `A_OVERWRITE_DATABASE` apuntan a archivos JSON independientes con la misma estructura (`ov_0` a `ov_3`, cada entrada con `id`, `fecha` y `descripcion`). La acción singular **Anachronic Overwrite** consulta la entrada `ov_0` en `A_OVERWRITE_DATABASE`.
+
 ```toml
 [general]
 BASE_INTERNAL_ROOT = "E:\_Internal"
 CACHE_SIZE = 15
 START_WITH_CURTAIN = true  # Activate the curtain when FrameEtude starts
+OVERWRITE_DATABASE = ""      # JSON used by the standard Overwrite actions
+A_OVERWRITE_DATABASE = ""    # Separate JSON used by Anachronic Overwrite
 ```
 
 ## 📁 Estructura del Proyecto
