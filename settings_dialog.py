@@ -79,17 +79,6 @@ class SettingsDialog(QtWidgets.QDialog):
         self.control_width.setValue(config.CONTROL_WIDTH_ESTIMATE)
         self.gen_layout.addRow("Control Width Estimate:", self.control_width)
 
-        # Campo de script con botón de búsqueda de archivo (.py)
-        self.rename_script = QtWidgets.QLineEdit()
-        self.rename_script.setText(config.RENAME_DIALOG_SCRIPT)
-        self.btn_browse_script = QtWidgets.QPushButton("Browse...")
-        self.btn_browse_script.clicked.connect(self._browse_script)
-        
-        script_layout = QtWidgets.QHBoxLayout()
-        script_layout.addWidget(self.rename_script)
-        script_layout.addWidget(self.btn_browse_script)
-        self.gen_layout.addRow("Rename Script:", script_layout)
-        
         # Campo de ruta raíz con botón de búsqueda de carpeta
         self.internal_root = QtWidgets.QLineEdit()
         self.internal_root.setText(config.BASE_INTERNAL_ROOT)
@@ -111,6 +100,17 @@ class SettingsDialog(QtWidgets.QDialog):
         ov_layout.addWidget(self.overwrite_db)
         ov_layout.addWidget(self.btn_browse_ov)
         self.gen_layout.addRow("Overwrite DB:", ov_layout)
+
+        # Base JSON independiente para Anachronic Overwrite.
+        self.a_overwrite_db = QtWidgets.QLineEdit()
+        self.a_overwrite_db.setText(config.A_OVERWRITE_DATABASE)
+        self.btn_browse_a_overwrite = QtWidgets.QPushButton("Browse...")
+        self.btn_browse_a_overwrite.clicked.connect(self._browse_a_overwrite_db)
+
+        a_ov_layout = QtWidgets.QHBoxLayout()
+        a_ov_layout.addWidget(self.a_overwrite_db)
+        a_ov_layout.addWidget(self.btn_browse_a_overwrite)
+        self.gen_layout.addRow("A. Overwrite DB:", a_ov_layout)
 
         # Campo para SEASON_DATABASE
         self.season_db = QtWidgets.QLineEdit()
@@ -149,14 +149,6 @@ class SettingsDialog(QtWidgets.QDialog):
         if value > 0 and value % 2 == 0:
             self.ocr_denoise.setValue(value + 1)
 
-    def _browse_script(self):
-        """Abre explorador nativo para seleccionar el script de Python."""
-        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Select Rename Script", self.rename_script.text(), "Python Files (*.py);;All Files (*)"
-        )
-        if file_path:
-            self.rename_script.setText(file_path)
-
     def _browse_root(self):
         """Abre explorador nativo para seleccionar el directorio raíz."""
         dir_path = QtWidgets.QFileDialog.getExistingDirectory(
@@ -172,6 +164,15 @@ class SettingsDialog(QtWidgets.QDialog):
         )
         if file_path:
             self.overwrite_db.setText(file_path)
+
+    def _browse_a_overwrite_db(self):
+        """Selecciona el JSON de Anachronic Overwrite."""
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Select A. Overwrite Database", self.a_overwrite_db.text(),
+            "JSON Files (*.json);;All Files (*)"
+        )
+        if file_path:
+            self.a_overwrite_db.setText(file_path)
 
     def _browse_season_db(self):
         """Abre explorador nativo para seleccionar el archivo JSON de seasons."""
@@ -208,9 +209,9 @@ class SettingsDialog(QtWidgets.QDialog):
             "START_WITH_CURTAIN": self.start_with_curtain.isChecked(),
             "CACHE_SIZE": int(self.cache_size.value()),
             "CONTROL_WIDTH_ESTIMATE": int(self.control_width.value()),
-            "RENAME_DIALOG_SCRIPT": str(self.rename_script.text()),
             "BASE_INTERNAL_ROOT": str(self.internal_root.text()),
             "OVERWRITE_DATABASE": str(self.overwrite_db.text()),
+            "A_OVERWRITE_DATABASE": str(self.a_overwrite_db.text()),
             "SEASON_DATABASE": str(self.season_db.text()),
             "BACKUP_PATH": str(self.backup_path.text())
         }
