@@ -119,6 +119,7 @@ class WorkframeDialog(QtWidgets.QDialog):
         del blocker
 
     def start_worker_and_open(self, path):
+        self.status.setText("Abriendo video...")
         if self.worker_thread is not None:
             try:
                 self.worker.close()
@@ -155,6 +156,7 @@ class WorkframeDialog(QtWidgets.QDialog):
         self.video_slider.setValue(0)
         self.video_slider.blockSignals(False)
         
+        self.status.setText("Video listo")
         self.request_current_frames()
 
     def _start_video_metadata_fetch(self, path: str):
@@ -192,6 +194,7 @@ class WorkframeDialog(QtWidgets.QDialog):
         )
 
     def on_worker_error(self, msg):
+        self.status.setText("Error al abrir el video")
         QtWidgets.QMessageBox.critical(self, "Worker error", msg)
 
     # ---------------- Requests ----------------
