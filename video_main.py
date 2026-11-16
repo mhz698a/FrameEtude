@@ -19,6 +19,7 @@ class VideoEtude(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.lyric_mode = False
+        self._active_year = ""
         self._workframe_dialogs = {}
         self._editor_splitter_active = False
         self.setWindowTitle("FrameEtude")
@@ -97,9 +98,8 @@ class VideoEtude(QtWidgets.QMainWindow):
 
         self.folder_selector_bar = FolderSelectorBar()
         self.folder_selector_bar.folderSelected.connect(self.on_master_changed)
-        self.folder_selector_bar.folderChanged.connect(
-            lambda: self.load_year_data(self.year_selector_bar.current_year())
-        )
+        self.folder_selector_bar.folderChanged.connect(self.refresh_active_year)
+        self.folder_selector_bar.folderRenamed.connect(self.on_folder_renamed)
 
         self.file_table = FileTableWidget()
         self.file_table.itemSelectionChanged.connect(self.on_file_selected)
@@ -231,7 +231,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             else:
                 QtWidgets.QMessageBox.warning(self, "Error", result)
         
-    def load_year_data(self, year: str):
+    def load_year_data(self, year: str, preferred_folder: str = ""):
         self.exit_lyric_mode(uncheck=True)
         self.chk_lyric.setEnabled(False)
         self.file_table.load_folder("")
@@ -240,8 +240,11 @@ class VideoEtude(QtWidgets.QMainWindow):
         
         if not year or year == "(no encontrado)":
             return
-        
-        year_path = os.path.join(config.BASE_INTERNAL_ROOT, year)
+
+        # Persist the displayed year even when its visual selection is cleared
+        # (the hidden-year selector intentionally clears the selected cell).
+        self._active_year = str(year)
+        year_path = os.path.join(config.BASE_INTERNAL_ROOT, self._active_year)
         
         # buscar carpeta que contenga "___[" en su nombre
         found = None
@@ -270,9 +273,37 @@ class VideoEtude(QtWidgets.QMainWindow):
             subs_sorted = sorted(subs, key=lambda x: os.path.basename(x))
             self.folder_selector_bar.set_folders(subs_sorted)
             if subs_sorted:
-                self.folder_selector_bar.setCurrentRow(0)
+                selected_index = 0
+                if preferred_folder:
+                    preferred_key = os.path.normcase(os.path.abspath(preferred_folder))
+                    for index, folder_path in enumerate(subs_sorted):
+                        folder_key = os.path.normcase(os.path.abspath(folder_path))
+                        if folder_key == preferred_key:
+                            selected_index = index
+                            break
+                self.folder_selector_bar.setCurrentRow(selected_index)
         except Exception:
             pass
+
+    def refresh_active_year(self):
+        """Refresh the currently displayed year without relying on visual year selection."""
+        year = self._active_year or self.year_selector_bar.current_year()
+        if not year:
+            return
+
+        current_folder = self.folder_selector_bar.current_folder_path()
+        if current_folder and not os.path.isdir(current_folder):
+            current_folder = ""
+
+        self.load_year_data(year, preferred_folder=current_folder)
+
+    def on_folder_renamed(self, old_path: str, new_path: str):
+        """Reload the active year and select the renamed folder at its new path."""
+        year = self._active_year or self.year_selector_bar.current_year()
+        if not year:
+            return
+
+        self.load_year_data(year, preferred_folder=new_path)
 
     def on_master_changed(self, path: str):
         self.exit_lyric_mode(uncheck=True)

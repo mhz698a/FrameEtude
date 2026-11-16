@@ -4,7 +4,8 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 
 class FolderSelectorBar(QtWidgets.QListWidget):
     folderSelected = QtCore.pyqtSignal(str)
-    folderChanged = QtCore.pyqtSignal() # To signal that folders were created/renamed/deleted
+    folderChanged = QtCore.pyqtSignal() # Generic folder list refresh (create/delete).
+    folderRenamed = QtCore.pyqtSignal(str, str) # Old and new folder paths.
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -136,7 +137,7 @@ class FolderSelectorBar(QtWidgets.QListWidget):
             new_path = os.path.join(base_dir, new_name)
             try:
                 os.rename(old_path, new_path)
-                self.folderChanged.emit()
+                self.folderRenamed.emit(old_path, new_path)
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Error", f"No se pudo renombrar la carpeta: {e}")
 
