@@ -16,6 +16,7 @@ from frame_player_panel import FramePlayerPanel
 from ocr_lib import OCRWorker
 from utils import format_time
 from vidwk_lib import VideoWorker
+from video_metadata_async_lib import VideoMetadataFetchThread, empty_video_metadata
 
 
 class WorkframeDialog(QtWidgets.QDialog):
@@ -45,6 +46,9 @@ class WorkframeDialog(QtWidgets.QDialog):
 
         self.worker = None
         self.worker_thread = None
+        self._video_metadata_thread = None
+        self.video_metadata = empty_video_metadata(pending=True)
+        self.duration_text = "00:00:00.000"
         self.fps = 25.0
         self.frame_count = 0
         self.frame_actual = 0
@@ -125,6 +129,7 @@ class WorkframeDialog(QtWidgets.QDialog):
             self.worker = None
             self.worker_thread = None
 
+        self._start_video_metadata_fetch(path)
         self.frame_canvas.clear_frame()
         self.worker = VideoWorker(cache_size=config.CACHE_SIZE)
         self.worker_thread = QtCore.QThread()
@@ -140,7 +145,8 @@ class WorkframeDialog(QtWidgets.QDialog):
         self.frame_count = frame_count
         self.video_name = os.path.basename(self.worker.path) if hasattr(self.worker, "path") else ""
         duration_text = format_time(self.frame_count / (self.fps or 25.0))
-        self.info_label.setText(f"{self.video_name} - {duration_text}")
+        self.duration_text = duration_text
+        self._update_info_label()
         self.setWindowTitle(f"{self.video_name} — {duration_text}")
         self.frame_actual = 0
         
@@ -150,6 +156,40 @@ class WorkframeDialog(QtWidgets.QDialog):
         self.video_slider.blockSignals(False)
         
         self.request_current_frames()
+
+    def _start_video_metadata_fetch(self, path: str):
+        self.video_metadata = empty_video_metadata(pending=True)
+        self._update_info_label()
+
+        thread = VideoMetadataFetchThread(path, self)
+        thread.metadata_ready.connect(self._on_video_metadata_ready)
+        self._video_metadata_thread = thread
+        thread.start()
+
+    @QtCore.pyqtSlot(str, object)
+    def _on_video_metadata_ready(self, path: str, metadata: dict):
+        expected_path = os.path.normcase(os.path.abspath(self.video_path))
+        result_path = os.path.normcase(os.path.abspath(path))
+        if result_path != expected_path:
+            return
+
+        self.video_metadata = metadata
+        self._update_info_label()
+
+    def _update_info_label(self):
+        metadata = self.video_metadata or {}
+        resolution = metadata.get("resolution", "N/A")
+        bit_rate = metadata.get("bit_rate", "N/A")
+        audio = metadata.get("audio", "N/A")
+        weight = metadata.get("weight", "N/A")
+
+        self.info_label.setText(
+            f"{self.video_name} - {self.duration_text}\\n"
+            f"Resolution: {resolution}  |  "
+            f"Bit Rate: {bit_rate}  |  "
+            f"Audio?: {audio}  |  "
+            f"Weight: {weight}"
+        )
 
     def on_worker_error(self, msg):
         QtWidgets.QMessageBox.critical(self, "Worker error", msg)
@@ -555,6 +595,13 @@ class WorkframeDialog(QtWidgets.QDialog):
                 self.selection_overlay.stop()
         except Exception:
             pass
+
+        metadata_thread = self._video_metadata_thread
+        if metadata_thread is not None:
+            if metadata_thread.isRunning():
+                metadata_thread.requestInterruption()
+                metadata_thread.wait()
+            self._video_metadata_thread = None
 
         thread = self.worker_thread
         worker = self.worker

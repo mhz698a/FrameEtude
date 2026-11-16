@@ -240,11 +240,14 @@ class FramePlayerPanel(QtWidgets.QWidget):
         # Etiqueta de nombre y duración con fondo negro y texto blanco
         main.info_label = QtWidgets.QLabel("FrameEtude - 00:00:00.000")
         main.info_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        main.info_label.setWordWrap(True)
+        main.info_label.setMinimumHeight(48)
         main.info_label.setStyleSheet("""
             background-color: black;
             color: white;
             padding: 6px;
             font-weight: bold;
+            font-size: 9pt;
             border: none;
         """)
         video_box_layout.addWidget(main.info_label)
