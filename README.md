@@ -4,7 +4,9 @@ Una aplicación de escritorio moderna para **navegar, inspeccionar y recortar vi
 
 ## ☀️ Características Principales
 
-- **Visor de fotograma único**: muestra el fotograma actual ajustado al área disponible y se redimensiona automáticamente con el `QSplitter`.
+- **Workframes independientes**: abre cada video en un diálogo no modal con controles y decodificador propios, permitiendo trabajar con varios videos simultáneamente.
+- **Editor de letras integrado**: permanece dentro de la ventana principal y comparte espacio con la tabla solo mientras está abierto.
+- **Detección de audio**: columna `Audio?` basada en MediaInfo, activada por defecto y configurable desde `Check Audio`.
 - **Navegador de fotogramas**: navega por el video fotograma a fotograma
 - **Recortador de video**: Extrae segmentos específicos de tus videos con precisión
 - **OCR integrado**: Extrae texto de fotogramas usando Tesseract con preprocesamiento adaptativo
@@ -27,6 +29,9 @@ Una aplicación de escritorio moderna para **navegar, inspeccionar y recortar vi
 - Tesseract OCR - Reconocimiento óptico de caracteres
 - Pillow - Manipulación de imágenes
 - PyFFmpeg - Procesamiento de video
+- pymediainfo - Detección de pistas de audio (requiere la biblioteca MediaInfo disponible en Windows)
+
+Para habilitar la detección de audio instala `pymediainfo` con `pip install pymediainfo`.
 
 ## 🚀 Instalación
 
@@ -132,6 +137,8 @@ FrameEtude/
 ├── settings_dialog.py             # Diálogo de configuración
 ├── vidwk_lib.py                   # Utilidades de trabajo con video
 ├── duration_async_lib.py          # Cálculo asincrónico de duraciones
+├── audio_async_lib.py             # Detección asincrónica de pistas de audio
+├── workframe_dialog.py            # Sesión de video independiente en ventana no modal
 ├── utils.py                       # Funciones utilitarias
 └── assets/                        # Iconos y recursos gráficos
 ```
