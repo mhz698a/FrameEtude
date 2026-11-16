@@ -1295,8 +1295,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 
                 menu.addSeparator()
                 menu.addAction("Copiar Ruta de este archivo", self.copy_current_file_path)
-                menu.addAction("Abrir este archivo con rename dialog", self.open_current_file_with_rename_dialog)
-                menu.addAction("Abrir este archivo", self.open_current_file)
+                menu.addAction("Abrir con rename dialog", self.open_current_file_with_rename_dialog)
+                menu.addAction("Abrir en WorkFrame", self.open_current_file)
         else:
             return super().contextMenuEvent(event)
 
