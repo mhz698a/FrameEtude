@@ -184,7 +184,7 @@ class WorkframeDialog(QtWidgets.QDialog):
         weight = metadata.get("weight", "N/A")
 
         self.info_label.setText(
-            f"{self.video_name} - {self.duration_text}\\n"
+            f"{self.video_name} - {self.duration_text}\n"
             f"Resolution: {resolution}  |  "
             f"Bit Rate: {bit_rate}  |  "
             f"Audio?: {audio}  |  "
