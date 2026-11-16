@@ -21,16 +21,21 @@ from vidwk_lib import VideoWorker
 class WorkframeDialog(QtWidgets.QDialog):
     """Independent, non-modal video session with its own decoder and controls."""
 
-    def __init__(self, video_path: str, parent=None):
-        super().__init__(parent)
+    def __init__(self, video_path: str):
+        # Un Workframe sin ventana propietaria obtiene una entrada independiente
+        # en la barra de tareas de Windows.
+        super().__init__(None)
         self.video_path = os.path.abspath(video_path)
-        self.setWindowFlags(
+        window_flags = (
             QtCore.Qt.WindowType.Window
             | QtCore.Qt.WindowType.WindowTitleHint
             | QtCore.Qt.WindowType.WindowSystemMenuHint
             | QtCore.Qt.WindowType.WindowMinMaxButtonsHint
             | QtCore.Qt.WindowType.WindowCloseButtonHint
         )
+        # El estado inicial siempre es normal (no Always on top).
+        window_flags &= ~QtCore.Qt.WindowType.WindowStaysOnTopHint
+        self.setWindowFlags(window_flags)
         self.setModal(False)
         self.setWindowModality(QtCore.Qt.WindowModality.NonModal)
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose, True)
@@ -66,16 +71,48 @@ class WorkframeDialog(QtWidgets.QDialog):
 
         self.start_worker_and_open(self.video_path)
 
-    def update_always_on_top(self, state):
-        enabled = bool(state) or state == QtCore.Qt.CheckState.Checked
+    def is_always_on_top(self) -> bool:
+        return bool(
+            self.windowFlags() & QtCore.Qt.WindowType.WindowStaysOnTopHint
+        )
+
+    def update_always_on_top(self, enabled: bool) -> None:
+        enabled = bool(enabled)
         flags = self.windowFlags()
+        current = bool(flags & QtCore.Qt.WindowType.WindowStaysOnTopHint)
+        if current == enabled:
+            self._sync_always_on_top_action(enabled)
+            return
+
+        was_visible = self.isVisible()
+        was_minimized = self.isMinimized()
+        was_maximized = self.isMaximized()
+
         if enabled:
             flags |= QtCore.Qt.WindowType.WindowStaysOnTopHint
         else:
             flags &= ~QtCore.Qt.WindowType.WindowStaysOnTopHint
+
         self.setWindowFlags(flags)
-        self.show()
-        self.raise_()
+        if was_visible:
+            if was_minimized:
+                self.showMinimized()
+            elif was_maximized:
+                self.showMaximized()
+            else:
+                self.show()
+            self.raise_()
+
+        self._sync_always_on_top_action(enabled)
+
+    def _sync_always_on_top_action(self, enabled: bool) -> None:
+        action = getattr(self, "always_on_top_action", None)
+        if action is None or action.isChecked() == enabled:
+            return
+
+        blocker = QtCore.QSignalBlocker(action)
+        action.setChecked(enabled)
+        del blocker
 
     def start_worker_and_open(self, path):
         if self.worker_thread is not None:

@@ -446,7 +446,7 @@ class VideoEtude(QtWidgets.QMainWindow):
             return
 
         try:
-            dialog = WorkframeDialog(video_path, self)
+            dialog = WorkframeDialog(video_path)
         except Exception as error:
             QtWidgets.QMessageBox.critical(
                 self, "Workframe", f"No se pudo abrir el video.\n\n{error}"
