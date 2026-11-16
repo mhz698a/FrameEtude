@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 
-from PyQt6 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 
 class YearSelectorBar(QtWidgets.QTableWidget):
@@ -17,8 +17,7 @@ class YearSelectorBar(QtWidgets.QTableWidget):
         self._cell_width = 30
         self._cell_height = 24
         
-        self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
-        self.customContextMenuRequested.connect(self._show_context_menu)
+        self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.NoContextMenu)
 
         self.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
@@ -92,6 +91,13 @@ class YearSelectorBar(QtWidgets.QTableWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._rebuild(preserve=self.current_year())
+
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
+        if event.button() == QtCore.Qt.MouseButton.RightButton:
+            self._show_context_menu(event.position().toPoint())
+            event.accept()
+            return
+        super().mousePressEvent(event)
 
     def _emit_selection(self) -> None:
         item = self.currentItem()

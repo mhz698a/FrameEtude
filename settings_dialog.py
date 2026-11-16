@@ -69,6 +69,10 @@ class SettingsDialog(QtWidgets.QDialog):
         self.start_with_curtain.setChecked(config.START_WITH_CURTAIN)
         self.gen_layout.addRow("Start with curtain:", self.start_with_curtain)
 
+        self.check_audio = QtWidgets.QCheckBox()
+        self.check_audio.setChecked(config.CHECK_AUDIO)
+        self.gen_layout.addRow("Check Audio:", self.check_audio)
+
         self.cache_size = QtWidgets.QSpinBox()
         self.cache_size.setRange(1, 100)
         self.cache_size.setValue(config.CACHE_SIZE)
@@ -207,6 +211,7 @@ class SettingsDialog(QtWidgets.QDialog):
         # Empaquetar datos generales
         new_general = {
             "START_WITH_CURTAIN": self.start_with_curtain.isChecked(),
+            "CHECK_AUDIO": self.check_audio.isChecked(),
             "CACHE_SIZE": int(self.cache_size.value()),
             "CONTROL_WIDTH_ESTIMATE": int(self.control_width.value()),
             "BASE_INTERNAL_ROOT": str(self.internal_root.text()),

@@ -341,11 +341,6 @@ class FramePlayerPanel(QtWidgets.QWidget):
             main.check_curtain.setChecked(config.START_WITH_CURTAIN)
 
 
-        if not hasattr(main, "check_always_on_top") or main.check_always_on_top is None:
-            main.check_always_on_top = QtWidgets.QCheckBox()
-            main.check_always_on_top.hide()
-            main.check_always_on_top.setChecked(False)
-
         # Botón de opciones (QToolButton para soportar menú instantáneo)
         btn_options = QtWidgets.QToolButton()
         btn_options.setText("Opciones")
@@ -367,8 +362,9 @@ class FramePlayerPanel(QtWidgets.QWidget):
 
         action_top = menu_options.addAction("Always on top")
         action_top.setCheckable(True)
-        action_top.setChecked(main.check_always_on_top.isChecked())
-        action_top.toggled.connect(lambda checked: (main.check_always_on_top.setChecked(checked), main.update_always_on_top(checked)))
+        action_top.setChecked(main.is_always_on_top())
+        main.always_on_top_action = action_top
+        action_top.toggled.connect(main.update_always_on_top)
 
         btn_options.setMenu(menu_options)
         controls_layout.addWidget(btn_options)

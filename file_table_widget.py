@@ -5,6 +5,7 @@ from typing import Any
 from PyQt6 import QtCore, QtGui, QtWidgets
 import config
 from duration_async_lib import DurationFetchJob, DurationFetchThread
+from audio_async_lib import AudioFetchJob, AudioFetchThread
 from metadata_async_lib import MetadataSaveJob, MetadataSaveThread
 from metadata_edit_lib import (
     COMMENT_KEYS,
@@ -82,6 +83,7 @@ class FolderScanThread(QtCore.QThread):
 
 class FileTableWidget(QtWidgets.QTableWidget):
     COLUMNS = [
+        ("Audio?", "audio"),
         ("Duration 🔒", "duration"),
         ("Filename", "filename"),
         ("Title", "title"),
@@ -106,6 +108,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
         super().__init__(parent)
         self._folder_cache: dict[str, list[dict[str, Any]]] = {}
         self._duration_cache: dict[str, str] = {}
+        self._audio_cache: dict[str, str] = {}
+        self._audio_threads: list[AudioFetchThread] = []
+        self._audio_enabled = bool(config.CHECK_AUDIO)
         self._folder_load_generation = 0
         self._active_folder_scan: FolderScanThread | None = None
         self._pending_folder_scan: tuple[int, str] | None = None
@@ -144,6 +149,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.DefaultContextMenu)
         self._restore_header_state()
+        self.setColumnHidden(self._column_index_by_key("audio"), not self._audio_enabled)
 
     def _restore_header_state(self):
         state = self._settings.value("header_state")
@@ -199,6 +205,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
     def _read_file_row(self, path: str) -> dict[str, Any]:
         row = self._empty_row()
+        row["audio"] = self._audio_cache.get(path, "")
         row["duration"] = self._duration_cache.get(path, "")
         row["filename"] = os.path.basename(path)
         row["full_path"] = path
@@ -238,6 +245,13 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
     def invalidate_folder(self, folder_path: str):
         self._folder_cache.pop(folder_path, None)
+        folder_key = os.path.normcase(os.path.abspath(folder_path))
+        for cached_path in tuple(self._audio_cache):
+            cached_folder = os.path.normcase(
+                os.path.abspath(os.path.dirname(cached_path))
+            )
+            if cached_folder == folder_key:
+                self._audio_cache.pop(cached_path, None)
 
     def load_folder(self, folder_path: str):
         # Every selection invalidates previous row and completion signals.
@@ -253,6 +267,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         # Duration jobs from the previous folder are no longer useful.
         for thread in tuple(self._duration_threads):
+            if thread.isRunning():
+                thread.requestInterruption()
+        for thread in tuple(self._audio_threads):
             if thread.isRunning():
                 thread.requestInterruption()
 
@@ -395,6 +412,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
         self._sync_scrollbars()
         self.row_count_changed.emit(len(rows))
         self._start_duration_fetch(rows)
+        if self._audio_enabled:
+            self._start_audio_fetch(rows)
 
     def stop_folder_loading(self) -> None:
         """Cancel folder and cached-row loading before the table is destroyed."""
@@ -407,8 +426,19 @@ class FileTableWidget(QtWidgets.QTableWidget):
             thread.wait()
 
         self._active_folder_scan = None
+        audio_threads = tuple(self._audio_threads)
+        for audio_thread in audio_threads:
+            if audio_thread.isRunning():
+                audio_thread.requestInterruption()
+        for audio_thread in audio_threads:
+            if audio_thread.isRunning():
+                audio_thread.wait()
 
     def _append_row_data(self, row_data: dict[str, Any]) -> None:
+        path = self._safe_text(row_data.get("full_path", ""))
+        if self._audio_enabled and path in self._audio_cache:
+            row_data["audio"] = self._audio_cache[path]
+
         row_index = self.rowCount()
         self.insertRow(row_index)
 
@@ -850,7 +880,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         for column, value in updates_by_column.items():
             if 0 <= column < self.columnCount():
                 key = self.COLUMNS[column][1]
-                if key == "duration":
+                if key in ("audio", "duration"):
                     continue
                 updates_by_key[key] = value
 
@@ -859,10 +889,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         replace_foreign = False
 
-        if any(
-            self.COLUMNS[column][1] in COMMENT_KEYS
-            for column in updates_by_column
-        ):
+        if any(key in COMMENT_KEYS for key in updates_by_key):
             status, existing_text = comment_status_from_path(path)
 
             if status == "foreign":
@@ -937,7 +964,11 @@ class FileTableWidget(QtWidgets.QTableWidget):
         item = self.currentItem()
         row = self.currentRow()
         column = self.currentColumn()
-        if item is None or row < 0 or column <= 0:
+        if item is None or row < 0 or column < 0 or column >= self.columnCount():
+            return
+
+        key = self.COLUMNS[column][1]
+        if key in ("audio", "duration"):
             return
 
         path = self._path_for_row(row)
@@ -1000,10 +1031,9 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
                 if target_col >= self.columnCount():
                     break
-                if target_col == 0:
-                    continue
-
                 key = self.COLUMNS[target_col][1]
+                if key in ("audio", "duration"):
+                    continue
                 updates_by_key[key] = value
 
             if not updates_by_key:
@@ -1146,7 +1176,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
                 self.setCurrentCell(index.row(), index.column())
                 
-                if logical_col != 0:
+                if logical_key not in ("audio", "duration"):
                     menu.addAction("Editar esta celda", self.edit_current_cell)
                     menu.addAction("Pegar datos desde esta celda", self.paste_from_current_cell)
                     menu.addAction(
@@ -1265,8 +1295,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 
                 menu.addSeparator()
                 menu.addAction("Copiar Ruta de este archivo", self.copy_current_file_path)
-                menu.addAction("Abrir este archivo con rename dialog", self.open_current_file_with_rename_dialog)
-                menu.addAction("Abrir este archivo", self.open_current_file)
+                menu.addAction("Abrir con rename dialog", self.open_current_file_with_rename_dialog)
+                menu.addAction("Abrir en WorkFrame", self.open_current_file)
         else:
             return super().contextMenuEvent(event)
 
@@ -1308,6 +1338,80 @@ class FileTableWidget(QtWidgets.QTableWidget):
                 return index
         return 0
 
+    def set_audio_check_enabled(self, enabled: bool) -> None:
+        self._audio_enabled = bool(enabled)
+        audio_column = self._column_index_by_key("audio")
+        if audio_column >= 0:
+            self.setColumnHidden(audio_column, not self._audio_enabled)
+
+        if not self._audio_enabled:
+            for thread in tuple(self._audio_threads):
+                if thread.isRunning():
+                    thread.requestInterruption()
+            return
+
+        rows = []
+        for row in range(self.rowCount()):
+            path = self._path_for_row(row)
+            if not path:
+                continue
+
+            cached_audio = self._audio_cache.get(path)
+            if cached_audio is not None:
+                self._update_audio_for_path(path, cached_audio)
+            else:
+                rows.append({"full_path": path})
+
+        self._start_audio_fetch(rows)
+
+    def _start_audio_fetch(self, rows: list[dict[str, Any]]) -> None:
+        jobs = []
+        for row in rows:
+            path = self._safe_text(row.get("full_path", ""))
+            if path and path not in self._audio_cache:
+                jobs.append(AudioFetchJob(path=path))
+
+        if not jobs:
+            return
+
+        thread = AudioFetchThread(jobs, self)
+        thread.audio_ready.connect(self._on_audio_ready)
+        thread.finished.connect(thread.deleteLater)
+        self._audio_threads.append(thread)
+        thread.finished.connect(
+            lambda t=thread: self._audio_threads.remove(t)
+            if t in self._audio_threads
+            else None
+        )
+        thread.start()
+
+    def _on_audio_ready(self, path: str, audio_text: str) -> None:
+        self._audio_cache[path] = audio_text
+        self._update_audio_for_path(path, audio_text)
+
+    def _update_audio_for_path(self, path: str, audio_text: str) -> None:
+        if not self._audio_enabled:
+            return
+        filename_col = self._filename_column()
+        audio_col = self._column_index_by_key("audio")
+        if filename_col < 0 or audio_col < 0:
+            return
+
+        for row in range(self.rowCount()):
+            item = self.item(row, filename_col)
+            if not item:
+                continue
+            if self._safe_text(item.data(QtCore.Qt.ItemDataRole.UserRole)) != path:
+                continue
+
+            audio_item = self.item(row, audio_col)
+            if audio_item is None:
+                audio_item = QtWidgets.QTableWidgetItem()
+                audio_item.setFlags(audio_item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+                self.setItem(row, audio_col, audio_item)
+            audio_item.setText(audio_text)
+            return
+
     def _start_duration_fetch(self, rows: list[dict[str, Any]]) -> None:
         jobs = []
         for row in rows:
@@ -1344,23 +1448,26 @@ class FileTableWidget(QtWidgets.QTableWidget):
             if self._safe_text(item.data(QtCore.Qt.ItemDataRole.UserRole)) != path:
                 continue
 
-            duration_item = self.item(row, 0)
+            duration_column = self._column_index_by_key("duration")
+            if duration_column < 0:
+                return
+            duration_item = self.item(row, duration_column)
             if duration_item is None:
                 duration_item = QtWidgets.QTableWidgetItem()
                 duration_item.setFlags(
                     duration_item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable
                 )
-                self.setItem(row, 0, duration_item)
+                self.setItem(row, duration_column, duration_item)
 
             duration_item.setText(duration_text)
             return
 
     def fill_column_from_clipboard(self, column: int):
-        if column <= 0 or column >= self.columnCount():
+        if column < 0 or column >= self.columnCount():
             return
 
         key = self.COLUMNS[column][1]
-        if key == "duration":
+        if key in ("audio", "duration"):
             return
 
         value = QtWidgets.QApplication.clipboard().text()
@@ -1414,11 +1521,11 @@ class FileTableWidget(QtWidgets.QTableWidget):
             self._run_metadata_jobs(jobs)
             
     def fill_column_from_input(self, column: int):
-        if column <= 0 or column >= self.columnCount():
+        if column < 0 or column >= self.columnCount():
             return
 
         key = self.COLUMNS[column][1]
-        if key == "duration":
+        if key in ("audio", "duration"):
             return
 
         value, ok = QtWidgets.QInputDialog.getText(
@@ -1459,11 +1566,11 @@ class FileTableWidget(QtWidgets.QTableWidget):
             self._run_metadata_jobs(jobs)
 
     def fill_column_with_voids(self, column: int):
-        if column <= 0 or column >= self.columnCount():
+        if column < 0 or column >= self.columnCount():
             return
 
         key = self.COLUMNS[column][1]
-        if key == "duration":
+        if key in ("audio", "duration"):
             return
         
         reply = QtWidgets.QMessageBox.warning(
@@ -1658,6 +1765,8 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
         if column < 0 or column >= self.columnCount():
             return
+        if self.COLUMNS[column][1] in ("audio", "duration"):
+            return
 
         jobs: list[MetadataSaveJob] = []
 
@@ -1717,15 +1826,15 @@ class FileTableWidget(QtWidgets.QTableWidget):
 
 
     def _apply_value_to_column(self, column: int, value: str, *, only_row: int | None = None) -> None:
-        if column <= 0 or column >= self.columnCount():
+        if column < 0 or column >= self.columnCount():
+            return
+
+        key = self.COLUMNS[column][1]
+        if key in ("audio", "duration"):
             return
 
         if only_row is not None:
             self._save_row_updates(only_row, {column: value})
-            return
-
-        key = self.COLUMNS[column][1]
-        if key == "duration":
             return
 
         jobs: list[MetadataSaveJob] = []

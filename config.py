@@ -44,6 +44,7 @@ DEFAULT_SETTINGS = {
     "CONTROL_WIDTH_ESTIMATE": 240,
     "CACHE_SIZE": 15, # tamaño máximo del cache LRU (afecta rendimiento de CPU/RAM)
     "START_WITH_CURTAIN": True,
+    "CHECK_AUDIO": True,
     "BACKUP_PATH": os.environ.get("OneDrive") or (USER_HOME / "Documents").as_posix(),
 }
 
@@ -142,4 +143,5 @@ BASE_INTERNAL_ROOT = str(_C["general"]["BASE_INTERNAL_ROOT"])
 CONTROL_WIDTH_ESTIMATE = int(_C["general"]["CONTROL_WIDTH_ESTIMATE"])
 CACHE_SIZE = int(_C["general"]["CACHE_SIZE"])
 START_WITH_CURTAIN = bool(_C["general"]["START_WITH_CURTAIN"])
+CHECK_AUDIO = bool(_C["general"]["CHECK_AUDIO"])
 BACKUP_PATH = str(_C["general"]["BACKUP_PATH"])
