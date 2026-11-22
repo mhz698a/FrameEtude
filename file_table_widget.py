@@ -1715,30 +1715,30 @@ class FileTableWidget(QtWidgets.QTableWidget):
         if jobs:
             self._run_metadata_jobs(jobs)
             
-    def _selected_year_px(self) -> str:
+    def _selected_year_full(self) -> str:
         window = self.window()
-        combo_year = getattr(window, "combo_year", None)
-        year = combo_year.currentText().strip() if combo_year else ""
+
+        # The current year is tracked independently from the visual selection.
+        # This also covers hidden years, whose selector cell is intentionally cleared.
+        year = str(getattr(window, "_active_year", "") or "").strip()
+
+        if not year:
+            year_selector = getattr(window, "year_selector_bar", None)
+            year = year_selector.current_year().strip() if year_selector else ""
 
         if not year or year == "(no encontrado)":
+            return ""
+
+        return year
+
+    def _selected_year_px(self) -> str:
+        year = self._selected_year_full()
+        if not year:
             return ""
 
         try:
             return f"{int(year) - 2003:02d}"
-        except ValueError:
-            return ""
-        
-    def _selected_year_full(self) -> str:
-        window = self.window()
-        combo_year = getattr(window, "combo_year", None)
-        year = combo_year.currentText().strip() if combo_year else ""
-
-        if not year or year == "(no encontrado)":
-            return ""
-
-        try:
-            return str(year)
-        except ValueError:
+        except (TypeError, ValueError):
             return ""
 
     def _disk_column_index(self) -> int:
