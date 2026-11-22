@@ -1653,7 +1653,7 @@ class FileTableWidget(QtWidgets.QTableWidget):
         ):
             self._run_metadata_jobs(jobs)
 
-    def _release_date_from_filename(self, path: str):
+    def _release_date_from_filename(self, path: str) -> str:
         filename = os.path.basename(path)
 
         for match in re.finditer(r'(?<!\d)((?:19|20)\d{2})-(\d{2})-(\d{2})(?!\d)', filename):
